@@ -1,70 +1,70 @@
-# WasteWise - Systeme IoT d'Analyse de Dechets
+# WasteWise - Système IoT d'Analyse de Déchets
 
 ## Description du Projet
 
-WasteWise est un systeme IoT intelligent base sur Raspberry Pi Zero 2 W concu pour analyser les dechets, automatiser les actions de tri et guider les utilisateurs vers les conteneurs appropries. Ce depot contient le code Python pour la partie embarquee du projet.
+WasteWise est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu pour analyser les déchets, automatiser les actions de tri et guider les utilisateurs vers les conteneurs appropriés. Ce dépôt contient le code Python pour la partie embarquée du projet.
 
 ## Objectifs
 
-- Analyser automatiquement les types de dechets a l'aide de capteurs et de vision par ordinateur
-- Classifier les dechets en categories (recyclable, compostable, dechets menagers, etc.)
-- Informer les utilisateurs sur le conteneur approprie pour chaque type de dechet
-- Collecter des donnees pour optimiser la gestion des dechets
-- Reduire la contamination des flux de recyclage
+- Analyser automatiquement les types de déchets à l'aide de capteurs et de vision par ordinateur
+- Classifier les déchets en catégories (recyclable, compostable, déchets ménagers, etc.)
+- Informer les utilisateurs sur le conteneur approprié pour chaque type de déchet
+- Collecter des données pour optimiser la gestion des déchets
+- Réduire la contamination des flux de recyclage
 
-## Specifications Techniques
+## Spécifications Techniques
 
-### Materiel Requis
+### Matériel Requis
 
 - Raspberry Pi Zero 2 W
-- Camera compatible Raspberry Pi (Camera Module v2 ou HQ recommandee)
-- Capteurs (a definir selon les besoins):
+- Caméra compatible Raspberry Pi (Camera Module v2 ou HQ recommandée)
+- Capteurs (à définir selon les besoins):
   - Capteur de poids
-  - Capteur de proximite
-  - LED/ecran pour les indications visuelles
+  - Capteur de proximité
+  - LED/écran pour les indications visuelles
 - Alimentation 5V/2.5A minimum
-- Carte microSD (16 GB minimum, classe 10 recommandee)
+- Carte microSD (16 GB minimum, classe 10 recommandée)
 
 ### Logiciels Requis
 
-- Raspberry Pi OS Lite (Bullseye ou version superieure)
-- Python 3.9 ou superieur
-- Bibliotheques Python (voir requirements.txt):
+- Raspberry Pi OS Lite (Bullseye ou version supérieure)
+- Python 3.9 ou supérieur
+- Bibliothèques Python (voir requirements.txt):
   - OpenCV pour la vision par ordinateur
-  - TensorFlow Lite pour l'inference de modeles de machine learning
-  - GPIO libraries pour le controle des capteurs
+  - TensorFlow Lite pour l'inférence de modèles de machine learning
+  - GPIO libraries pour le contrôle des capteurs
   - Flask/FastAPI pour l'interface API (optionnel)
 
 ## Installation
 
-### 1. Preparation du Raspberry Pi
+### 1. Préparation du Raspberry Pi
 
 Installez Raspberry Pi OS sur votre carte microSD:
 
 ```bash
-# Mettre a jour le systeme
+# Mettre à jour le système
 sudo apt-get update
 sudo apt-get upgrade -y
 ```
 
-### 2. Installation des Dependances
+### 2. Installation des Dépendances
 
 ```bash
 # Installer Python et pip
 sudo apt-get install python3-pip python3-dev -y
 
-# Installer les bibliotheques systeme necessaires
+# Installer les bibliothèques système nécessaires
 sudo apt-get install libatlas-base-dev libopenjp2-7 libtiff5 -y
 ```
 
-### 3. Cloner le Depot
+### 3. Cloner le Dépôt
 
 ```bash
 git clone https://github.com/Andylamothe/WasteWise.git
 cd WasteWise
 ```
 
-### 4. Installer les Dependances Python
+### 4. Installer les Dépendances Python
 
 ```bash
 pip3 install -r requirements.txt
@@ -72,7 +72,7 @@ pip3 install -r requirements.txt
 
 ### 5. Configuration
 
-Creez un fichier de configuration `config.json`:
+Créez un fichier de configuration `config.json`:
 
 ```json
 {
@@ -94,7 +94,7 @@ Creez un fichier de configuration `config.json`:
 
 ## Utilisation
 
-### Demarrage du Systeme
+### Démarrage du Système
 
 ```bash
 # Lancer le programme principal
@@ -107,63 +107,63 @@ python3 main.py
 # Tester les capteurs
 python3 test_sensors.py
 
-# Tester la camera
+# Tester la caméra
 python3 test_camera.py
 ```
 
-## Architecture du Systeme
+## Architecture du Système
 
-Le systeme est compose de plusieurs modules:
+Le système est composé de plusieurs modules:
 
-1. **Module de Capture**: Gere la camera et l'acquisition d'images
-2. **Module d'Analyse**: Utilise des modeles de machine learning pour classifier les dechets
-3. **Module de Capteurs**: Interface avec les capteurs de poids et de proximite
-4. **Module de Communication**: Envoie les resultats aux clients (affichage, API, etc.)
-5. **Module de Stockage**: Enregistre les donnees pour analyse ulterieure
+1. **Module de Capture**: Gère la caméra et l'acquisition d'images
+2. **Module d'Analyse**: Utilise des modèles de machine learning pour classifier les déchets
+3. **Module de Capteurs**: Interface avec les capteurs de poids et de proximité
+4. **Module de Communication**: Envoie les résultats aux clients (affichage, API, etc.)
+5. **Module de Stockage**: Enregistre les données pour analyse ultérieure
 
 ## Structure du Code
 
 ```
 WasteWise/
-├── main.py                 # Point d'entree principal
-├── config.json             # Configuration du systeme
-├── requirements.txt        # Dependances Python
+├── main.py                 # Point d'entrée principal
+├── config.json             # Configuration du système
+├── requirements.txt        # Dépendances Python
 ├── modules/
-│   ├── camera.py          # Gestion de la camera
-│   ├── classifier.py      # Classification des dechets
+│   ├── camera.py          # Gestion de la caméra
+│   ├── classifier.py      # Classification des déchets
 │   ├── sensors.py         # Interface capteurs
 │   └── communication.py   # Communication avec les clients
-├── models/                # Modeles de machine learning
+├── models/                # Modèles de machine learning
 └── tests/                 # Tests unitaires
 ```
 
-## Fonctionnalites Principales
+## Fonctionnalités Principales
 
-### Detection et Classification
+### Détection et Classification
 
-Le systeme detecte automatiquement la presence d'un dechet et:
-1. Capture une image du dechet
-2. Analyse l'image avec un modele de classification
-3. Determine la categorie du dechet
+Le système détecte automatiquement la présence d'un déchet et:
+1. Capture une image du déchet
+2. Analyse l'image avec un modèle de classification
+3. Détermine la catégorie du déchet
 4. Mesure le poids (si applicable)
 
 ### Guidage Utilisateur
 
-Une fois le dechet analyse, le systeme:
-1. Affiche la categorie determinee
-2. Indique le conteneur approprie
+Une fois le déchet analysé, le système:
+1. Affiche la catégorie déterminée
+2. Indique le conteneur approprié
 3. Peut activer des LED pour guider physiquement l'utilisateur
 4. Enregistre la transaction pour les statistiques
 
-## Developpement
+## Développement
 
-### Ajouter de Nouvelles Categories
+### Ajouter de Nouvelles Catégories
 
-Modifiez le fichier `config.json` pour ajouter de nouvelles categories de dechets.
+Modifiez le fichier `config.json` pour ajouter de nouvelles catégories de déchets.
 
-### Entrainer un Nouveau Modele
+### Entraîner un Nouveau Modèle
 
-Utilisez le script `train_model.py` pour entrainer un nouveau modele de classification:
+Utilisez le script `train_model.py` pour entraîner un nouveau modèle de classification:
 
 ```bash
 python3 train_model.py --dataset /path/to/dataset --epochs 50
@@ -174,52 +174,52 @@ python3 train_model.py --dataset /path/to/dataset --epochs 50
 Les contributions sont les bienvenues. Pour contribuer:
 
 1. Forkez le projet
-2. Creez une branche pour votre fonctionnalite (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Committez vos changements (`git commit -m 'Ajout d'une nouvelle fonctionnalite'`)
+2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/nouvelle-fonctionnalite`)
+3. Committez vos changements (`git commit -m 'Ajout d'une nouvelle fonctionnalité'`)
 4. Poussez vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
 5. Ouvrez une Pull Request
 
-## Depannage
+## Dépannage
 
-### La camera ne fonctionne pas
+### La caméra ne fonctionne pas
 
-Verifiez que la camera est activee:
+Vérifiez que la caméra est activée:
 ```bash
 sudo raspi-config
 # Interface Options > Camera > Enable
 ```
 
-### Erreurs de memoire
+### Erreurs de mémoire
 
-Le Raspberry Pi Zero 2 W a une memoire limitee. Reduisez la resolution de la camera dans `config.json`.
+Le Raspberry Pi Zero 2 W a une mémoire limitée. Réduisez la résolution de la caméra dans `config.json`.
 
-### Problemes de GPIO
+### Problèmes de GPIO
 
-Assurez-vous que l'utilisateur a les permissions necessaires:
+Assurez-vous que l'utilisateur a les permissions nécessaires:
 ```bash
 sudo usermod -a -G gpio $USER
 ```
 
 ## Performance et Optimisation
 
-- Utilisez TensorFlow Lite pour des modeles optimises
-- Limitez la resolution de la camera pour economiser la memoire
-- Implementez un systeme de mise en cache pour les predictions frequentes
-- Utilisez des threads pour paralleliser le traitement
+- Utilisez TensorFlow Lite pour des modèles optimisés
+- Limitez la résolution de la caméra pour économiser la mémoire
+- Implémentez un système de mise en cache pour les prédictions fréquentes
+- Utilisez des threads pour paralléliser le traitement
 
-## Securite et Confidentialite
+## Sécurité et Confidentialité
 
-- Les images sont traitees localement sur le Raspberry Pi
-- Aucune image n'est envoyee vers le cloud par defaut
-- Les donnees statistiques peuvent etre anonymisees avant transmission
+- Les images sont traitées localement sur le Raspberry Pi
+- Aucune image n'est envoyée vers le cloud par défaut
+- Les données statistiques peuvent être anonymisées avant transmission
 
 ## Licence
 
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de details.
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ## Support et Contact
 
-Pour toute question ou probleme, veuillez ouvrir une issue sur GitHub.
+Pour toute question ou problème, veuillez ouvrir une issue sur GitHub.
 
 ## Ressources Additionnelles
 
@@ -229,8 +229,8 @@ Pour toute question ou probleme, veuillez ouvrir une issue sur GitHub.
 
 ## Roadmap
 
-- Integration avec des API de gestion de dechets municipaux
+- Intégration avec des API de gestion de déchets municipaux
 - Support multi-langues pour les instructions
 - Dashboard web pour visualiser les statistiques
-- Mode hors-ligne avec synchronisation differee
-- Support pour d'autres modeles de Raspberry Pi
+- Mode hors-ligne avec synchronisation différée
+- Support pour d'autres modèles de Raspberry Pi
