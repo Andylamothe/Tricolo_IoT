@@ -100,6 +100,8 @@ Créez un fichier de configuration `config.json`:
 }
 ```
 
+**Note**: Le haut-parleur peut être connecté via la sortie audio intégrée du Raspberry Pi ou via un amplificateur audio connecté au GPIO 12 (PWM). Pour une meilleure qualité audio, utilisez la sortie audio jack 3.5mm ou un DAC I2S.
+
 ## Utilisation
 
 ### Démarrage du Système
@@ -151,7 +153,7 @@ WasteWise/
 
 ### Détection et Classification
 
-Le système détecte automatiquement la présence d'un déchet et:
+Le système permet à l'utilisateur de classifier un déchet:
 1. L'utilisateur appuie sur le bouton tactile pour déclencher la capture
 2. Capture une image du déchet avec la caméra
 3. Analyse l'image avec un modèle de classification
@@ -161,7 +163,7 @@ Le système détecte automatiquement la présence d'un déchet et:
 
 Une fois le déchet analysé, le système:
 1. Affiche la catégorie déterminée via les LED correspondantes
-2. Annonce auditivement le type de bac approprié via le haut-parleur (synthèse vocale)
+2. Annonce vocalement le type de bac approprié via le haut-parleur (synthèse vocale)
 3. Vérifie avec le capteur ultrasonique si le bac approprié est plein
 4. Guide physiquement l'utilisateur avec les LED de catégorie (recyclable, compostable, ordures)
 5. Enregistre la transaction pour les statistiques
