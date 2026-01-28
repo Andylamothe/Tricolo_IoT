@@ -18,11 +18,11 @@ WasteWise est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu
 
 - Raspberry Pi Zero 2 W
 - Caméra compatible Raspberry Pi (Camera Module v2 ou HQ recommandée)
-- Capteurs (à définir selon les besoins):
-  - Capteur de poids
-  - Capteur de proximité
-  - LED/écran pour les indications visuelles
-- Alimentation 5V/2.5A minimum
+- 5 LED (2 pour l'état du système, 3 pour les types de bacs)
+- 1 capteur ultrasonique pour détecter si les bacs sont remplis
+- 1 bouton tactile pour prendre des photos avec la caméra
+- 1 haut-parleur pour le système de synthèse vocale (Text-to-Speech)
+- 1 powerbank pour la portabilité de la machine
 - Carte microSD (16 GB minimum, classe 10 recommandée)
 
 ### Logiciels Requis
@@ -32,7 +32,8 @@ WasteWise est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu
 - Bibliothèques Python (voir requirements.txt):
   - OpenCV pour la vision par ordinateur
   - TensorFlow Lite pour l'inférence de modèles de machine learning
-  - GPIO libraries pour le contrôle des capteurs
+  - RPi.GPIO pour le contrôle des GPIO (LED, bouton, capteur ultrasonique)
+  - gTTS ou pyttsx3 pour la synthèse vocale (Text-to-Speech)
   - Flask/FastAPI pour l'interface API (optionnel)
 
 ## Installation
@@ -80,9 +81,16 @@ Créez un fichier de configuration `config.json`:
     "resolution": [640, 480],
     "framerate": 30
   },
-  "sensors": {
-    "weight_pin": 17,
-    "proximity_pin": 27
+  "gpio": {
+    "led_status_1": 17,
+    "led_status_2": 27,
+    "led_recyclable": 22,
+    "led_compostable": 23,
+    "led_ordures": 24,
+    "ultrasonic_trigger": 5,
+    "ultrasonic_echo": 6,
+    "touch_button": 18,
+    "speaker": 12
   },
   "categories": {
     "recyclable": "Bac bleu",
@@ -115,10 +123,10 @@ python3 test_camera.py
 
 Le système est composé de plusieurs modules:
 
-1. **Module de Capture**: Gère la caméra et l'acquisition d'images
+1. **Module de Capture**: Gère la caméra et l'acquisition d'images via le bouton tactile
 2. **Module d'Analyse**: Utilise des modèles de machine learning pour classifier les déchets
-3. **Module de Capteurs**: Interface avec les capteurs de poids et de proximité
-4. **Module de Communication**: Envoie les résultats aux clients (affichage, API, etc.)
+3. **Module de Capteurs**: Interface avec le capteur ultrasonique pour détecter le niveau de remplissage des bacs
+4. **Module de Communication**: Gère les LED d'indication et la synthèse vocale
 5. **Module de Stockage**: Enregistre les données pour analyse ultérieure
 
 ## Structure du Code
@@ -131,7 +139,9 @@ WasteWise/
 ├── modules/
 │   ├── camera.py          # Gestion de la caméra
 │   ├── classifier.py      # Classification des déchets
-│   ├── sensors.py         # Interface capteurs
+│   ├── sensors.py         # Interface capteurs (ultrasonique, bouton)
+│   ├── leds.py            # Contrôle des LED d'état et de catégorie
+│   ├── tts.py             # Synthèse vocale (Text-to-Speech)
 │   └── communication.py   # Communication avec les clients
 ├── models/                # Modèles de machine learning
 └── tests/                 # Tests unitaires
@@ -142,18 +152,19 @@ WasteWise/
 ### Détection et Classification
 
 Le système détecte automatiquement la présence d'un déchet et:
-1. Capture une image du déchet
-2. Analyse l'image avec un modèle de classification
-3. Détermine la catégorie du déchet
-4. Mesure le poids (si applicable)
+1. L'utilisateur appuie sur le bouton tactile pour déclencher la capture
+2. Capture une image du déchet avec la caméra
+3. Analyse l'image avec un modèle de classification
+4. Détermine la catégorie du déchet (recyclable, compostable ou ordures)
 
 ### Guidage Utilisateur
 
 Une fois le déchet analysé, le système:
-1. Affiche la catégorie déterminée
-2. Indique le conteneur approprié
-3. Peut activer des LED pour guider physiquement l'utilisateur
-4. Enregistre la transaction pour les statistiques
+1. Affiche la catégorie déterminée via les LED correspondantes
+2. Annonce auditivement le type de bac approprié via le haut-parleur (synthèse vocale)
+3. Vérifie avec le capteur ultrasonique si le bac approprié est plein
+4. Guide physiquement l'utilisateur avec les LED de catégorie (recyclable, compostable, ordures)
+5. Enregistre la transaction pour les statistiques
 
 ## Développement
 
