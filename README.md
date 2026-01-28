@@ -100,7 +100,10 @@ Créez un fichier de configuration `config.json`:
 }
 ```
 
-**Note**: Le haut-parleur peut être connecté via la sortie audio intégrée du Raspberry Pi ou via un amplificateur audio connecté au GPIO 12 (PWM). Pour une meilleure qualité audio, utilisez la sortie audio jack 3.5mm ou un DAC I2S.
+**Note sur le haut-parleur**: 
+- Pour une qualité audio optimale, utilisez la sortie audio jack 3.5mm intégrée ou un DAC I2S
+- Le GPIO 12 dans la configuration est optionnel et peut être utilisé pour contrôler un amplificateur externe ou pour du PWM audio basique
+- Si vous utilisez la sortie audio intégrée, le paramètre "speaker" dans la configuration n'est pas nécessaire
 
 ## Utilisation
 
@@ -144,7 +147,7 @@ WasteWise/
 │   ├── sensors.py         # Interface capteurs (ultrasonique, bouton)
 │   ├── leds.py            # Contrôle des LED d'état et de catégorie
 │   ├── tts.py             # Synthèse vocale (Text-to-Speech)
-│   └── communication.py   # Communication avec les clients
+│   └── communication.py   # Gestion des LED et de la synthèse vocale
 ├── models/                # Modèles de machine learning
 └── tests/                 # Tests unitaires
 ```
