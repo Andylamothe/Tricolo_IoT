@@ -1,8 +1,8 @@
-# WasteWise - Système IoT d'Analyse de Déchets
+# Tricolo - Système IoT d'Analyse de Déchets
 
 ## Description du Projet
 
-WasteWise est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu pour analyser les déchets, automatiser les actions de tri et guider les utilisateurs vers les conteneurs appropriés. Ce dépôt contient le code Python pour la partie embarquée du projet.
+Tricolo est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu pour analyser les déchets, automatiser les actions de tri et guider les utilisateurs vers les conteneurs appropriés. Ce dépôt contient le code Python pour la partie embarquée du projet.
 
 ## Objectifs
 
