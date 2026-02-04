@@ -1,252 +1,246 @@
-# Tricolo - Système IoT d'Analyse de Déchets
+# Tricolo – Système IoT Intelligent de Triage des Déchets
 
-## Description du Projet
+##  Description du Projet
 
-Tricolo est un système IoT intelligent basé sur Raspberry Pi Zero 2 W conçu pour analyser les déchets, automatiser les actions de tri et guider les utilisateurs vers les conteneurs appropriés. Ce dépôt contient le code Python pour la partie embarquée du projet.
+**Tricolo** est un système IoT intelligent basé sur **Raspberry Pi 4**, conçu pour assister les utilisateurs dans le tri des déchets grâce à des **indications visuelles (LED)**, **sonores (feedback vocal)** et à une **collecte de données centralisée** accessible via une application mobile.
 
-## Objectifs
+Le système détecte une interaction utilisateur, analyse le contexte (présence / état du bac), fournit un retour immédiat et transmet les données à un serveur web pour affichage dans un tableau de bord.
 
-- Analyser automatiquement les types de déchets à l'aide de capteurs et de vision par ordinateur
-- Classifier les déchets en catégories (recyclable, compostable, déchets ménagers, etc.)
-- Informer les utilisateurs sur le conteneur approprié pour chaque type de déchet
-- Collecter des données pour optimiser la gestion des déchets
-- Réduire la contamination des flux de recyclage
+Ce projet est réalisé dans un cadre **académique**, avec une architecture réaliste, modulaire et orientée IoT.
 
-## Spécifications Techniques
+---
 
-### Matériel Requis
+##  Objectifs du Projet
 
-- Raspberry Pi Zero 2 W
-- Caméra compatible Raspberry Pi (Camera Module v2 ou HQ recommandée)
-- 5 LED (2 pour l'état du système, 3 pour les types de bacs)
-- 1 capteur ultrasonique pour détecter si les bacs sont remplis
-- 1 bouton tactile pour prendre des photos avec la caméra
-- 1 haut-parleur pour le système de synthèse vocale (Text-to-Speech)
-- 1 powerbank pour la portabilité de la machine
-- Carte microSD (16 GB minimum, classe 10 recommandée)
+- Guider l’utilisateur vers le bon bac (recyclage, compost, déchets)
+- Fournir un feedback clair et immédiat (LED + audio)
+- Détecter si un bac est plein
+- Envoyer les données vers un backend en temps réel
+- Visualiser les statistiques dans une application mobile
+- Réduire les erreurs de tri des déchets
 
-### Logiciels Requis
+---
 
-- Raspberry Pi OS Lite (Bullseye ou version supérieure)
-- Python 3.9 ou supérieur
-- Bibliothèques Python (voir requirements.txt):
-  - OpenCV pour la vision par ordinateur
-  - TensorFlow Lite pour l'inférence de modèles de machine learning
-  - RPi.GPIO pour le contrôle des GPIO (LED, bouton, capteur ultrasonique)
-  - gTTS ou pyttsx3 pour la synthèse vocale (Text-to-Speech)
-  - Flask/FastAPI pour l'interface API (optionnel)
+##  Fonctionnalités Principales
 
-## Installation
+| Fonction | Description |
+|--------|------------|
+| Interaction utilisateur | Bouton physique |
+| Feedback visuel | LED RGB |
+| Feedback vocal | Haut-parleur |
+| Détection de niveau | Capteur ultrasonique |
+| Communication réseau | WebSocket + REST |
+| Collecte de données | Statistiques de tri |
+| Dashboard | Application mobile |
 
-### 1. Préparation du Raspberry Pi
+---
 
-Installez Raspberry Pi OS sur votre carte microSD:
+##  Spécifications Techniques
 
-```bash
-# Mettre à jour le système
-sudo apt-get update
-sudo apt-get upgrade -y
+###  Matériel Utilisé
+
+| Composant | Quantité | Rôle |
+|---------|----------|------|
+| Raspberry Pi 4 (2GB ou +) | 1 | Unité centrale |
+| LED RGB keystudios | 2 | Indication d’état et de bac |
+| caméra pi | 1 | prendre en photo le déchet |
+| Capteur ultrasonique (HC-SR04) | 1 | Détection bac plein |
+| Bouton poussoir | 1 | Déclenchement utilisateur |
+| Haut-parleur USB | 1 | Feedback vocal |
+| Powerbank USB | 1 | Alimentation portable |
+| Carte microSD (16 GB min) | 1 | OS + application |
+
+---
+
+###  Capacités du Raspberry Pi 4
+
+| Ressource | Détails |
+|---------|--------|
+| CPU | Quad-core ARM Cortex-A72 |
+| RAM | 2 GB ou plus |
+| GPIO | 40 broches |
+| Réseau | Wi-Fi + Ethernet |
+| USB | USB 2.0 / 3.0 |
+| Audio | HDMI / USB |
+
+ Le Raspberry Pi 4 est largement suffisant pour ce projet.
+
+---
+
+##  Mapping GPIO (Configuration Recommandée)
+
+| Composant | GPIO |
+|---------|------|
+| LED RGB #1 | GPIO 17 |
+| LED RGB #2 | GPIO 27 |
+| LED RGB #3 | GPIO 22 |
+| LED RGB #4 | GPIO 23 |
+| LED RGB #5 | GPIO 24 |
+| Ultrasonic Trigger | GPIO 5 |
+| Ultrasonic Echo | GPIO 6 |
+| Bouton | GPIO 18 |
+| Audio | USB (aucun GPIO) |
+
+ Le signal **Echo** du capteur ultrasonique doit passer par un **diviseur de tension** (5V → 3.3V).
+
+---
+
+##  Logiciels Utilisés
+
+| Logiciel | Rôle |
+|--------|------|
+| Raspberry Pi OS | Système d’exploitation |
+| Python 3.9+ | Logique embarquée |
+| RPi.GPIO | Gestion des GPIO |
+| WebSocket | Communication temps réel |
+| REST API | Backend |
+| pyttsx3 | Synthèse vocale |
+| PostgreSQL / SQLite | Stockage des données |
+
+---
+
+
+## 📐 Diagramme UML – Architecture du Système
+
+
+
+```mermaid
+graph TD
+    User[Utilisateur]
+
+    Button[Bouton tactile]
+    Ultrasonic[Capteur ultrasonique]
+    Camera[Caméra]
+
+    Pi[Raspberry Pi 4]
+    LED[LED RGB]
+    Speaker[Haut-parleur]
+    WSClient[Client WebSocket]
+    RESTClient[Client API REST]
+
+    Server[Serveur Web / Backend]
+    API[API REST]
+    WS[Serveur WebSocket]
+    AI[API IA externe]
+    DB[(Base de données)]
+
+    Mobile[Application mobile / Dashboard]
+
+    %% Interaction utilisateur
+    User --> Button
+    User --> Camera
+
+    %% Capteurs vers Pi
+    Button --> Pi
+    Ultrasonic --> Pi
+    Camera --> Pi
+
+    %% Modules Pi
+    Pi --> LED
+    Pi --> Speaker
+    Pi --> WSClient
+    Pi --> RESTClient
+
+    %% Communication réseau
+    RESTClient --> API
+    WSClient --> WS
+
+    %% Backend logique
+    API --> Server
+    WS --> Server
+    Server --> AI
+    Server --> DB
+
+    %% Visualisation
+    DB --> Mobile
+
+
 ```
 
-### 2. Installation des Dépendances
+---
 
-```bash
-# Installer Python et pip
-sudo apt-get install python3-pip python3-dev -y
+##  Communication Pi ↔ Serveur
 
-# Installer les bibliothèques système nécessaires
-sudo apt-get install libatlas-base-dev libopenjp2-7 libtiff5 -y
-```
+### Architecture retenue
 
-### 3. Cloner le Dépôt
+| Type | Utilisation |
+|----|------------|
+| REST API | Envoi de données (scan, état bac) |
+| WebSocket | Réponses en temps réel |
+| Format | JSON |
 
-```bash
-git clone https://github.com/Andylamothe/WasteWise.git
-cd WasteWise
-```
-
-### 4. Installer les Dépendances Python
-
-```bash
-pip3 install -r requirements.txt
-```
-
-### 5. Configuration
-
-Créez un fichier de configuration `config.json`:
+### Exemple de message envoyé
 
 ```json
 {
-  "camera": {
-    "resolution": [640, 480],
-    "framerate": 30
-  },
-  "gpio": {
-    "led_status_1": 17,
-    "led_status_2": 27,
-    "led_recyclable": 22,
-    "led_compostable": 23,
-    "led_ordures": 24,
-    "ultrasonic_trigger": 5,
-    "ultrasonic_echo": 6,
-    "touch_button": 18,
-    "speaker": 12
-  },
-  "categories": {
-    "recyclable": "Bac bleu",
-    "compostable": "Bac vert",
-    "ordures": "Bac noir"
-  }
+  "event": "waste_detected",
+  "category": "recyclage",
+  "timestamp": "2026-02-04T20:15:00"
 }
 ```
+## 📂 Structure du Projet
 
-**Note sur le haut-parleur**: 
-- Pour une qualité audio optimale, utilisez la sortie audio jack 3.5mm intégrée ou un DAC I2S
-- Le GPIO 12 dans la configuration est optionnel et peut être utilisé pour contrôler un amplificateur externe ou pour du PWM audio basique
-- Si vous utilisez la sortie audio intégrée, le paramètre "speaker" dans la configuration n'est pas nécessaire
-
-## Utilisation
-
-### Démarrage du Système
-
-```bash
-# Lancer le programme principal
-python3 main.py
-```
-
-### Mode de Test
-
-```bash
-# Tester les capteurs
-python3 test_sensors.py
-
-# Tester la caméra
-python3 test_camera.py
-```
-
-## Architecture du Système
-
-Le système est composé de plusieurs modules:
-
-1. **Module de Capture**: Gère la caméra et l'acquisition d'images via le bouton tactile
-2. **Module d'Analyse**: Utilise des modèles de machine learning pour classifier les déchets
-3. **Module de Capteurs**: Interface avec le capteur ultrasonique pour détecter le niveau de remplissage des bacs
-4. **Module de Communication**: Gère les LED d'indication et la synthèse vocale
-5. **Module de Stockage**: Enregistre les données pour analyse ultérieure
-
-## Structure du Code
-
-```
-WasteWise/
-├── main.py                 # Point d'entrée principal
-├── config.json             # Configuration du système
+```text
+Tricolo/
+├── main.py                 # Point d’entrée du système embarqué
+├── config.json             # Configuration GPIO, réseau et paramètres généraux
 ├── requirements.txt        # Dépendances Python
 ├── modules/
-│   ├── camera.py          # Gestion de la caméra
-│   ├── classifier.py      # Classification des déchets
-│   ├── sensors.py         # Interface capteurs (ultrasonique, bouton)
-│   ├── leds.py            # Contrôle des LED d'état et de catégorie
-│   ├── tts.py             # Synthèse vocale (Text-to-Speech)
-│   └── communication.py   # Gestion des LED et de la synthèse vocale
-├── models/                # Modèles de machine learning
-└── tests/                 # Tests unitaires
+│   ├── gpio_manager.py     # Gestion centralisée des GPIO
+│   ├── leds.py             # Contrôle des LED RGB (feedback visuel)
+│   ├── sensors.py          # Capteur ultrasonique et bouton
+│   ├── audio.py            # Feedback vocal (haut-parleur)
+│   ├── websocket_client.py # Client WebSocket vers le backend
+│   └── stats.py            # Envoi des statistiques et événements
+├── backend/
+│   ├── api.py              # API REST (réception des données du Raspberry Pi)
+│   ├── websocket.py        # Serveur WebSocket (communication temps réel)
+│   └── database.py         # Gestion de la base de données
+└── tests/
+    ├── test_gpio.py        # Tests des GPIO
+    └── test_audio.py       # Tests audio
 ```
 
-## Fonctionnalités Principales
+---
 
-### Détection et Classification
+##  Utilisation
 
-Le système permet à l'utilisateur de classifier un déchet:
-1. L'utilisateur appuie sur le bouton tactile pour déclencher la capture
-2. Capture une image du déchet avec la caméra
-3. Analyse l'image avec un modèle de classification
-4. Détermine la catégorie du déchet (recyclable, compostable ou ordures)
-
-### Guidage Utilisateur
-
-Une fois le déchet analysé, le système:
-1. Affiche la catégorie déterminée via les LED correspondantes
-2. Annonce vocalement le type de bac approprié via le haut-parleur (synthèse vocale)
-3. Vérifie avec le capteur ultrasonique si le bac approprié est plein
-4. Guide physiquement l'utilisateur avec les LED de catégorie (recyclable, compostable, ordures)
-5. Enregistre la transaction pour les statistiques
-
-## Développement
-
-### Ajouter de Nouvelles Catégories
-
-Modifiez le fichier `config.json` pour ajouter de nouvelles catégories de déchets.
-
-### Entraîner un Nouveau Modèle
-
-Utilisez le script `train_model.py` pour entraîner un nouveau modèle de classification:
+### Démarrage du système embarqué
 
 ```bash
-python3 train_model.py --dataset /path/to/dataset --epochs 50
+python3 main.py
+Tests individuels
+python3 tests/test_gpio.py
+python3 tests/test_audio.py
 ```
+##  Limites du Projet
+Reconnaissance limitée aux catégories définies
 
-## Contribution
+Nécessite une connexion réseau active
 
-Les contributions sont les bienvenues. Pour contribuer:
+Prototype non destiné à un usage industriel ou commercial
 
-1. Forkez le projet
-2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Committez vos changements (`git commit -m 'Ajout d'une nouvelle fonctionnalité'`)
-4. Poussez vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
-5. Ouvrez une Pull Request
+##  Sécurité et Confidentialité
+Aucune donnée personnelle stockée
 
-## Dépannage
+Communications chiffrées via HTTPS / WSS
 
-### La caméra ne fonctionne pas
+Données utilisées uniquement à des fins statistiques et pédagogiques
 
-Vérifiez que la caméra est activée:
-```bash
-sudo raspi-config
-# Interface Options > Camera > Enable
-```
+##  Roadmap
+Ajout d’un écran d’affichage
 
-### Erreurs de mémoire
+Mode hors-ligne avec synchronisation différée
 
-Le Raspberry Pi Zero 2 W a une mémoire limitée. Réduisez la résolution de la caméra dans `config.json`.
+Ajout de nouvelles catégories
 
-### Problèmes de GPIO
+Amélioration du dashboard mobile
 
-Assurez-vous que l'utilisateur a les permissions nécessaires:
-```bash
-sudo usermod -a -G gpio $USER
-```
+Intégration IA (optionnelle)
 
-## Performance et Optimisation
+##  Licence
+Projet distribué sous licence MIT.
 
-- Utilisez TensorFlow Lite pour des modèles optimisés
-- Limitez la résolution de la caméra pour économiser la mémoire
-- Implémentez un système de mise en cache pour les prédictions fréquentes
-- Utilisez des threads pour paralléliser le traitement
+##  Support
+Pour toute question ou problème, veuillez ouvrir une issue GitHub sur le dépôt du projet.
 
-## Sécurité et Confidentialité
-
-- Les images sont traitées localement sur le Raspberry Pi
-- Aucune image n'est envoyée vers le cloud par défaut
-- Les données statistiques peuvent être anonymisées avant transmission
-
-## Licence
-
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
-
-## Support et Contact
-
-Pour toute question ou problème, veuillez ouvrir une issue sur GitHub.
-
-## Ressources Additionnelles
-
-- Documentation Raspberry Pi: https://www.raspberrypi.org/documentation/
-- TensorFlow Lite: https://www.tensorflow.org/lite
-- OpenCV: https://opencv.org/
-
-## Roadmap
-
-- Intégration avec des API de gestion de déchets municipaux
-- Support multi-langues pour les instructions
-- Dashboard web pour visualiser les statistiques
-- Mode hors-ligne avec synchronisation différée
-- Support pour d'autres modèles de Raspberry Pi
