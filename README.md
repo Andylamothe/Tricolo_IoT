@@ -1,3 +1,5 @@
+<img  width="231" height="123" alt="image" src="https://github.com/user-attachments/assets/390c512c-b817-48c5-b40b-649d19009e57" />
+
 # Tricolo – Système IoT Intelligent de Triage des Déchets
 
 ##  Description du Projet
@@ -243,4 +245,5 @@ Projet distribué sous licence MIT.
 
 ##  Support
 Pour toute question ou problème, veuillez ouvrir une issue GitHub sur le dépôt du projet.
+
 
