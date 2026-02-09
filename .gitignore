@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environnement virtuel
+venv/
+env/
+ENV/
+.venv
+
+# Variables d'environnement
+.env
+.env.local
+
+# Fichiers audio générés
+audio/
+*.mp3
+*.wav
+
+# Fichiers temporaires
+temp_audio.*
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
