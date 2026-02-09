@@ -50,10 +50,52 @@ def generate_all_messages():
     print("Tous les messages ont été générés!\n")
 
 
-def play_message(message_name):
-    """Lit un message audio spécifique."""
+def play_response(category):
+    """
+    Joue un message audio en fonction de la réponse du backend.
+    
+    Args:
+        category (str): Catégorie retournée par le backend
+            Options: 'RECYCLAGE', 'COMPOST', 'DECHETS', 'BAC_PLEIN', 'ERREUR'
+    """
     player = AudioPlayer()
-    player.play(message_name)
+    
+    # Mapping des catégories vers les fichiers audio
+    category_map = {
+        'RECYCLAGE': 'recyclage',
+        'COMPOST': 'compost',
+        'DECHETS': 'dechets',
+        'BAC_PLEIN': 'bac_plein',
+        'ERREUR': 'erreur_detection',
+        'ATTENTE': 'attente',
+        'MERCI': 'merci',
+        'INTRODUCTION': 'introduction'
+    }
+    
+    # Convertir en majuscules et chercher le message
+    category_upper = category.upper()
+    
+    if category_upper in category_map:
+        message_file = category_map[category_upper]
+        print(f"\n[SYSTEME] Catégorie détectée: {category}")
+        print(f"[SYSTEME] Lecture du message: {message_file}")
+        player.play(message_file)
+    else:
+        print(f"[ERREUR] Catégorie inconnue: {category}")
+        print(f"[INFO] Catégories valides: {', '.join(category_map.keys())}")
+
+
+def simulate_backend_response(category):
+    """
+    Simule une réponse du backend et joue le message correspondant.
+    
+    Args:
+        category (str): Catégorie simulée du backend
+    """
+    print(f"\n{'='*60}")
+    print(f"Simulation de réponse backend: {category}")
+    print(f"{'='*60}")
+    play_response(category)
 
 
 def list_audio_files():
@@ -66,11 +108,15 @@ if __name__ == '__main__':
     print("Tricolo IoT System")
     print("=" * 60 + "\n")
     
-    # Générer tous les messages (à exécuter une seule fois)
-    generate_all_messages()
+    # 1. Générer tous les messages (à exécuter une seule fois)
+    # generate_all_messages()
     
-    # Lister les fichiers disponibles
+    # 2. Tester avec différentes catégories
+    # simulate_backend_response("RECYCLAGE")
+    # simulate_backend_response("COMPOST")
+    # simulate_backend_response("DECHETS")
+    # simulate_backend_response("BAC_PLEIN")
+    # simulate_backend_response("ERREUR")
+    
+    # 3. Lister les fichiers disponibles
     list_audio_files()
-    
-    # Lire un message spécifique
-    play_message("introduction")
