@@ -8,209 +8,254 @@ from signal import pause
 from threading import Thread, Event
 from tts import AudioPlayer
 
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-BUTTON = 12
+# GPIO Pins
+BUTTON_PIN = 12
+STATUS_LED_PINS = (16, 20, 21)  # R, G, B
+RESULT_LED_PINS = (5, 6, 13)    # R, G, B
 
-STATUS_LED = (16, 20, 21) #R,G,B
-RESULT_LED = (5, 6, 13) #R,G,B
+# API Configuration
+API_BASE_URL = "https://iotbackend-4ufq.onrender.com/api"
+LOGIN_URL = f"{API_BASE_URL}/login"
+UPLOAD_URL = f"{API_BASE_URL}/upload-image"
+JETER_URL = f"{API_BASE_URL}/jeter"
 
-UPLOAD_URL = "https://iotbackend-4ufq.onrender.com/api/upload-image"
-LOGIN_URL = "https://iotbackend-4ufq.onrender.com/api/login"
-CATEGORIE_URL = "https://iotbackend-4ufq.onrender.com/api/jeter/"
-IMAGE_DIR = "photos"
-
+# Credentials
 USERNAME = "test"
 PASSWORD = "test"
 
+# Directories
+IMAGE_DIR = "photos"
+
+# LED Colors
+COLORS = {
+    'blue': (0, 0, 1),
+    'orange': (1, 0.5, 0),
+    'green': (0, 1, 0),
+    'purple': (1, 0, 1),
+    'red': (1, 0, 0),
+    'off': (0, 0, 0)
+}
+
+# Category to LED color mapping
+CATEGORY_COLORS = {
+    "recyclage": COLORS['green'],
+    "compost": COLORS['orange'],
+    "poubelle": COLORS['purple']
+}
+
+# Category to audio message mapping
+AUDIO_MESSAGES = {
+    "introduction": "introduction",
+    "attente": "attente",
+    "recyclage": "recyclage",
+    "compost": "compost",
+    "poubelle": "dechets",
+    "dechets": "dechets",
+    "bac_plein": "bac_plein",
+    "erreur": "erreur_detection",
+    "merci": "merci",
+}
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 
-button = Button(BUTTON, pull_up=True, bounce_time=0.1)
-
-status_led = RGBLED(*STATUS_LED, active_high=False)
-result_led = RGBLED(*RESULT_LED, active_high=False)
+button = Button(BUTTON_PIN, pull_up=True, bounce_time=0.1)
+status_led = RGBLED(*STATUS_LED_PINS, active_high=False)
+result_led = RGBLED(*RESULT_LED_PINS, active_high=False)
 
 camera = Picamera2()
 camera.configure(camera.create_still_configuration())
 camera.start()
-time.sleep(2)  # laisser camera se reveiller
+time.sleep(2)
 
-auth_token = None  # stocké après login
-
-BLUE = (0, 0, 1)
-ORANGE = (1, 0.5, 0)
-GREEN = (0, 1, 0)
-PURPLE = (1, 0, 1)
-RED = (1, 0, 0)
-OFF = (0, 0, 0)
-
+auth_token = None
 ready_event = Event()
+audio_player = AudioPlayer()
 
-def play_response(category):
-    """Joue un message audio selon la catégorie backend."""
-    player = AudioPlayer()
+# ============================================================================
+# FUNCTIONS
+# ============================================================================
+# ============================================================================
+# FUNCTIONS
+# ============================================================================
 
-    category_map = {
-        "introduction": "introduction",
-        "attente": "attente",
-        "recyclage": "recyclage",
-        "compost": "compost",
-        "poubelle": "dechets",
-        "dechets": "dechets",
-        "bac_plein": "bac_plein",
-        "erreur": "erreur_detection",
-        "merci": "merci",
-    }
-
+def play_audio(category):
+    """Joue un message audio selon la catégorie."""
     key = (category or "").strip().lower()
-    message_file = category_map.get(key, "erreur_detection")
-    print(f"[SYSTEME] Catégorie détectée: {key}")
-    print(f"[SYSTEME] Lecture du message: {message_file}")
-    player.play(message_file)
+    message_file = AUDIO_MESSAGES.get(key, "erreur_detection")
+    print(f"[AUDIO] {message_file}")
+    audio_player.play(message_file)
+
 
 def ready_animation():
+    """Animation LED bleue quand le système est prêt."""
     while not ready_event.is_set():
-        status_led.color = BLUE
+        status_led.color = COLORS['blue']
         time.sleep(1)
-        status_led.color = OFF
+        status_led.color = COLORS['off']
         time.sleep(0.5)
-
-ready_event.clear()
-Thread(target=ready_animation, daemon=True).start()
 
 
 def login():
+    """Authentifie l'utilisateur et récupère le token."""
     global auth_token
-    print("Token non trouvé, login...")
-
-    payload = {
-        "username": USERNAME,
-        "password": PASSWORD
-    }
-
-    r = requests.post(LOGIN_URL, json=payload, timeout=30)
-    r.raise_for_status()
-
-    data = r.json()
-    print(data)
-    auth_token = data.get("accessToken")
-
-    if not auth_token:
-        raise Exception("Aucun token trouvé du server")
-
-    print("Token recu")
+    print("[SYSTEME] Connexion au backend...")
+    
+    try:
+        response = requests.post(
+            LOGIN_URL,
+            json={"username": USERNAME, "password": PASSWORD},
+            timeout=30
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        auth_token = data.get("accessToken")
+        
+        if not auth_token:
+            raise Exception("Token non trouvé dans la réponse")
+        
+        print("[SYSTEME] Authentification réussie")
+        
+    except Exception as e:
+        print(f"[ERREUR] Échec de connexion: {e}")
+        raise
 
 
 def upload_image(image_path, retry=False):
+    """Upload l'image au backend et gère le retry en cas de token expiré."""
     global auth_token
-
-    headers = {}
-    if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
-
-    # pour ne pas laisser le fichier ouvert
-    with open(image_path, "rb") as img:
-        files = {
-            "image": ("photo.jpg", img, "image/jpeg")
-        }
-        response = requests.post(
-            UPLOAD_URL,
-            files=files,
-            headers=headers,
-            timeout=30
-        )
-
-    # verif erreur token
+    
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
+    
     try:
-        message = response.json().get("message")
-    except ValueError:
-        message = None
+        with open(image_path, "rb") as img:
+            files = {"image": ("photo.jpg", img, "image/jpeg")}
+            response = requests.post(UPLOAD_URL, files=files, headers=headers, timeout=30)
+        
+        # Vérification erreur token
+        try:
+            message = response.json().get("message", "")
+        except ValueError:
+            message = ""
+        
+        if message in ("Token manquant", "Token invalide ou expiré") and not retry:
+            print("[AVERTISSEMENT] Token expiré, reconnexion...")
+            login()
+            return upload_image(image_path, retry=True)
+        
+        return response
+        
+    except Exception as e:
+        print(f"[ERREUR] Upload échoué: {e}")
+        raise
 
-    if message in ("Token manquant", "Token invalide ou expiré") and not retry:
-        login()
-        return upload_image(image_path, retry=True)
 
-    return response
+def send_jeter_request(category):
+    """Envoie la requête POST au endpoint /jeter."""
+    try:
+        url = f"{JETER_URL}/{category}"
+        payload = {"categorieAnalyser": category}
+        response = requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+        print(f"[SYSTEME] Requête /jeter envoyée pour: {category}")
+    except Exception as e:
+        print(f"[ERREUR] Échec requête /jeter: {e}")
+
+
+def set_result_led(category):
+    """Configure la LED de résultat selon la catégorie."""
+    color = CATEGORY_COLORS.get(category, COLORS['red'])
+    result_led.color = color
+    print(f"[LED] Couleur: {category} -> {color}")
+
 
 def reset_system():
+    """Réinitialise le système après 10 secondes."""
     time.sleep(10)
-
+    
     result_led.off()
     status_led.off()
-
+    
     ready_event.clear()
     Thread(target=ready_animation, daemon=True).start()
+    
+    print("[SYSTEME] Réinitialisé. Prêt pour le prochain objet.")
 
-    print("Système réinitialisé. Prêt pour le prochain objet.")
 
 def take_and_send_photo():
-    global auth_token
-    print("Bouton appuyé, prise de photo en cours...")
-
+    """Workflow principal: photo -> upload -> classification -> feedback."""
+    print("[SYSTEME] Bouton appuyé, prise de photo...")
+    
+    # Arrêt animation ready
     ready_event.set()
-
     result_led.off()
-
-    status_led.color = ORANGE
-
-    play_response("attente")
-
+    
+    # LED orange + message attente
+    status_led.color = COLORS['orange']
+    play_audio("attente")
+    
+    # Capture photo
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     image_path = f"{IMAGE_DIR}/photo_{timestamp}.jpg"
-
     camera.capture_file(image_path)
-
-    print(f"Uploading {image_path}...")
-
+    print(f"[SYSTEME] Photo capturée: {image_path}")
+    
     try:
+        # Upload image
         response = upload_image(image_path)
-
-        print("Upload status:", response.status_code)
-        print("Server response:", response.text)
+        print(f"[SYSTEME] Upload status: {response.status_code}")
+        
         status_led.off()
-
+        
+        # Récupération catégorie
         category = response.text.strip().lower()
+        print(f"[SYSTEME] Catégorie: {category}")
         
-
-        payload = {
-        "categorieAnalyser": category
-            } 
-        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"  
-        cat = requests.post(URL_, json=payload)
+        # Envoi requête /jeter
+        send_jeter_request(category)
         
-        cat.raise_for_status()
-
-        data = cat.json()
-        print(data)
-        auth_token = data.get("accessToken")
-
-        if category == "recyclage":
-            result_led.color = GREEN
-        elif category == "compost":
-            result_led.color = ORANGE
-        elif category == "poubelle":
-            result_led.color = PURPLE
-        else:
-            result_led.color = RED
-
-        play_response(category)
-        play_response("merci")
-
+        # LED de résultat
+        set_result_led(category)
+        
+        # Messages audio
+        play_audio(category)
+        play_audio("merci")
+        
+        # Reset asynchrone
         Thread(target=reset_system, daemon=True).start()
-
+        
     except Exception as e:
-        print("Upload failed:", e)
+        print(f"[ERREUR] Traitement échoué: {e}")
         status_led.off()
-        result_led.color = RED
+        result_led.color = COLORS['red']
+        play_audio("erreur")
         Thread(target=reset_system, daemon=True).start()
 
+# ============================================================================
+# MAIN
+# ============================================================================
+# ============================================================================
+# MAIN
+# ============================================================================
 
+# Démarrage animation ready
+ready_event.clear()
+Thread(target=ready_animation, daemon=True).start()
+
+# Configuration du bouton
 button.when_pressed = take_and_send_photo
 
-print("Appuyez sur le buton pour prendre une photo.")
+# Message d'introduction
+print("[SYSTEME] Tricolo IoT démarré")
+play_audio("introduction")
 
-# Message d'introduction au démarrage
-play_response("introduction")
-
-# mieux qu'un while loop
+# Boucle principale
 pause()
