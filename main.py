@@ -1,122 +1,216 @@
-from tts import TextToSpeechGenerator, AudioPlayer
-
-# Messages du système Tricolo
-MESSAGES = {
-    "introduction": (
-        "Bienvenue sur Tricolo, le système intelligent de tri des déchets. "
-        "Appuyez sur le bouton et présentez votre déchet devant la caméra."
-    ),
-    "recyclage": (
-        "Ce déchet va dans le bac de recyclage. "
-        "Merci de contribuer à la protection de l'environnement."
-    ),
-    "compost": (
-        "Ce déchet va dans le bac à compost. "
-        "Parfait pour nourrir la terre."
-    ),
-    "dechets": (
-        "Ce déchet va dans le bac des déchets ordinaires. "
-        "Merci pour votre participation."
-    ),
-    "bac_plein": (
-        "Attention, le bac est plein. "
-        "Veuillez contacter le service d'entretien."
-    ),
-    "erreur_detection": (
-        "Désolé, je n'ai pas pu identifier votre déchet. "
-        "Veuillez réessayer en le positionnant mieux devant la caméra."
-    ),
-    "attente": (
-        "Analyse en cours, veuillez patienter."
-    ),
-    "merci": (
-        "Merci d'utiliser Tricolo. À bientôt!"
-    )
-}
+from gpiozero import Button, RGBLED
+from picamera2 import Picamera2
+from datetime import datetime
+import requests
+import time
+import os
+from signal import pause
+from threading import Thread, Event
+from tts import AudioPlayer
 
 
-def generate_all_messages():
-    """Génère tous les messages audio du projet."""
-    print("=" * 60)
-    print("Génération des messages audio Tricolo")
-    print("=" * 60 + "\n")
-    
-    generator = TextToSpeechGenerator(voice='fr-FR-DeniseNeural')
-    
-    for name, text in MESSAGES.items():
-        print(f"[{name}] {text}")
-        generator.save(text, name)
-    
-    print("Tous les messages ont été générés!\n")
+BUTTON = 12
 
+STATUS_LED = (16, 20, 21) #R,G,B
+RESULT_LED = (5, 6, 13) #R,G,B
+
+UPLOAD_URL = "https://iotbackend-4ufq.onrender.com/api/upload-image"
+LOGIN_URL = "https://iotbackend-4ufq.onrender.com/api/login"
+CATEGORIE_URL = "https://iotbackend-4ufq.onrender.com/api/jeter/"
+IMAGE_DIR = "photos"
+
+USERNAME = "test"
+PASSWORD = "test"
+
+
+os.makedirs(IMAGE_DIR, exist_ok=True)
+
+button = Button(BUTTON, pull_up=True, bounce_time=0.1)
+
+status_led = RGBLED(*STATUS_LED, active_high=False)
+result_led = RGBLED(*RESULT_LED, active_high=False)
+
+camera = Picamera2()
+camera.configure(camera.create_still_configuration())
+camera.start()
+time.sleep(2)  # laisser camera se reveiller
+
+auth_token = None  # stocké après login
+
+BLUE = (0, 0, 1)
+ORANGE = (1, 0.5, 0)
+GREEN = (0, 1, 0)
+PURPLE = (1, 0, 1)
+RED = (1, 0, 0)
+OFF = (0, 0, 0)
+
+ready_event = Event()
 
 def play_response(category):
-    """
-    Joue un message audio en fonction de la réponse du backend.
-    
-    Args:
-        category (str): Catégorie retournée par le backend
-            Options: 'RECYCLAGE', 'COMPOST', 'DECHETS', 'BAC_PLEIN', 'ERREUR'
-    """
+    """Joue un message audio selon la catégorie backend."""
     player = AudioPlayer()
-    
-    # Mapping des catégories vers les fichiers audio
+
     category_map = {
-        'RECYCLAGE': 'recyclage',
-        'COMPOST': 'compost',
-        'DECHETS': 'dechets',
-        'BAC_PLEIN': 'bac_plein',
-        'ERREUR': 'erreur_detection',
-        'ATTENTE': 'attente',
-        'MERCI': 'merci',
-        'INTRODUCTION': 'introduction'
+        "introduction": "introduction",
+        "attente": "attente",
+        "recyclage": "recyclage",
+        "compost": "compost",
+        "poubelle": "dechets",
+        "dechets": "dechets",
+        "bac_plein": "bac_plein",
+        "erreur": "erreur_detection",
+        "merci": "merci",
     }
-    
-    # Convertir en majuscules et chercher le message
-    category_upper = category.upper()
-    
-    if category_upper in category_map:
-        message_file = category_map[category_upper]
-        print(f"\n[SYSTEME] Catégorie détectée: {category}")
-        print(f"[SYSTEME] Lecture du message: {message_file}")
-        player.play(message_file)
-    else:
-        print(f"[ERREUR] Catégorie inconnue: {category}")
-        print(f"[INFO] Catégories valides: {', '.join(category_map.keys())}")
+
+    key = (category or "").strip().lower()
+    message_file = category_map.get(key, "erreur_detection")
+    print(f"[SYSTEME] Catégorie détectée: {key}")
+    print(f"[SYSTEME] Lecture du message: {message_file}")
+    player.play(message_file)
+
+def ready_animation():
+    while not ready_event.is_set():
+        status_led.color = BLUE
+        time.sleep(1)
+        status_led.color = OFF
+        time.sleep(0.5)
+
+ready_event.clear()
+Thread(target=ready_animation, daemon=True).start()
 
 
-def simulate_backend_response(category):
-    """
-    Simule une réponse du backend et joue le message correspondant.
-    
-    Args:
-        category (str): Catégorie simulée du backend
-    """
-    print(f"\n{'='*60}")
-    print(f"Simulation de réponse backend: {category}")
-    print(f"{'='*60}")
-    play_response(category)
+def login():
+    global auth_token
+    print("Token non trouvé, login...")
+
+    payload = {
+        "username": USERNAME,
+        "password": PASSWORD
+    }
+
+    r = requests.post(LOGIN_URL, json=payload, timeout=30)
+    r.raise_for_status()
+
+    data = r.json()
+    print(data)
+    auth_token = data.get("accessToken")
+
+    if not auth_token:
+        raise Exception("Aucun token trouvé du server")
+
+    print("Token recu")
 
 
-def list_audio_files():
-    """Liste tous les fichiers audio."""
-    player = AudioPlayer()
-    player.list_files()
+def upload_image(image_path, retry=False):
+    global auth_token
+
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+
+    # pour ne pas laisser le fichier ouvert
+    with open(image_path, "rb") as img:
+        files = {
+            "image": ("photo.jpg", img, "image/jpeg")
+        }
+        response = requests.post(
+            UPLOAD_URL,
+            files=files,
+            headers=headers,
+            timeout=30
+        )
+
+    # verif erreur token
+    try:
+        message = response.json().get("message")
+    except ValueError:
+        message = None
+
+    if message in ("Token manquant", "Token invalide ou expiré") and not retry:
+        login()
+        return upload_image(image_path, retry=True)
+
+    return response
+
+def reset_system():
+    time.sleep(10)
+
+    result_led.off()
+    status_led.off()
+
+    ready_event.clear()
+    Thread(target=ready_animation, daemon=True).start()
+
+    print("Système réinitialisé. Prêt pour le prochain objet.")
+
+def take_and_send_photo():
+    global auth_token
+    print("Bouton appuyé, prise de photo en cours...")
+
+    ready_event.set()
+
+    result_led.off()
+
+    status_led.color = ORANGE
+
+    play_response("attente")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    image_path = f"{IMAGE_DIR}/photo_{timestamp}.jpg"
+
+    camera.capture_file(image_path)
+
+    print(f"Uploading {image_path}...")
+
+    try:
+        response = upload_image(image_path)
+
+        print("Upload status:", response.status_code)
+        print("Server response:", response.text)
+        status_led.off()
+
+        category = response.text.strip().lower()
+        
+
+        payload = {
+        "categorieAnalyser": category
+            } 
+        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"  
+        cat = requests.post(URL_, json=payload)
+        
+        cat.raise_for_status()
+
+        data = cat.json()
+        print(data)
+        auth_token = data.get("accessToken")
+
+        if category == "recyclage":
+            result_led.color = GREEN
+        elif category == "compost":
+            result_led.color = ORANGE
+        elif category == "poubelle":
+            result_led.color = PURPLE
+        else:
+            result_led.color = RED
+
+        play_response(category)
+        play_response("merci")
+
+        Thread(target=reset_system, daemon=True).start()
+
+    except Exception as e:
+        print("Upload failed:", e)
+        status_led.off()
+        result_led.color = RED
+        Thread(target=reset_system, daemon=True).start()
 
 
-if __name__ == '__main__':
-    print("Tricolo IoT System")
-    print("=" * 60 + "\n")
-    
-    # 1. Générer tous les messages (à exécuter une seule fois)
-    # generate_all_messages()
-    
-    # 2. Tester avec différentes catégories
-    # simulate_backend_response("RECYCLAGE")
-    # simulate_backend_response("COMPOST")
-    # simulate_backend_response("DECHETS")
-    # simulate_backend_response("BAC_PLEIN")
-    # simulate_backend_response("ERREUR")
-    
-    # 3. Lister les fichiers disponibles
-    list_audio_files()
+button.when_pressed = take_and_send_photo
+
+print("Appuyez sur le buton pour prendre une photo.")
+
+# Message d'introduction au démarrage
+play_response("introduction")
+
+# mieux qu'un while loop
+pause()
