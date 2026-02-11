@@ -16,8 +16,8 @@ ENV/
 .env.local
 
 # Fichiers audio générés
-audio/
-*.mp3
+#audio/
+#*.mp3
 *.wav
 
 # Fichiers temporaires
