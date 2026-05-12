@@ -18,6 +18,10 @@ MESSAGES = {
         "Ce déchet va dans le bac des déchets ordinaires. "
         "Merci pour votre participation."
     ),
+    "autre": (
+        "Ce déchet ne va dans aucun des bacs présents à votre droite. "
+        "Merci pour votre participation."
+    ),
     "bac_plein": (
         "Attention, le bac est plein. "
         "Veuillez contacter le service d'entretien."
@@ -56,7 +60,7 @@ def play_response(category):
     
     Args:
         category (str): Catégorie retournée par le backend
-            Options: 'RECYCLAGE', 'COMPOST', 'DECHETS', 'BAC_PLEIN', 'ERREUR'
+            Options: 'RECYCLAGE', 'COMPOST', 'DECHETS', 'AUTRE', 'BAC_PLEIN', 'ERREUR'
     """
     player = AudioPlayer()
     
@@ -65,6 +69,7 @@ def play_response(category):
         'RECYCLAGE': 'recyclage',
         'COMPOST': 'compost',
         'DECHETS': 'dechets',
+        'AUTRE': 'autre',
         'BAC_PLEIN': 'bac_plein',
         'ERREUR': 'erreur_detection',
         'ATTENTE': 'attente',
@@ -115,6 +120,7 @@ if __name__ == '__main__':
     # simulate_backend_response("RECYCLAGE")
     # simulate_backend_response("COMPOST")
     # simulate_backend_response("DECHETS")
+    # simulate_backend_response("AUTRE")
     # simulate_backend_response("BAC_PLEIN")
     # simulate_backend_response("ERREUR")
     

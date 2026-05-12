@@ -7,12 +7,25 @@ import os
 from signal import pause
 from threading import Thread, Event
 from tts import AudioPlayer
+import RPi.GPIO as GPIO
 
 
 BUTTON = 12
 
 STATUS_LED = (16, 20, 21) #R,G,B
 RESULT_LED = (5, 6, 13) #R,G,B
+
+TRIG = 23
+ECHO = 24
+
+SPEED_OF_SOUND = 34300  # cm/s
+FULL_DURATION = 10
+
+BIN_RANGES = {
+    "recyclabe": (10, 40),
+    "compost": (41, 70),
+    "poubelle": (71, 100),
+}
 
 UPLOAD_URL = "https://iotbackend-4ufq.onrender.com/api/upload-image"
 LOGIN_URL = "https://iotbackend-4ufq.onrender.com/api/login"
@@ -44,6 +57,10 @@ PURPLE = (1, 0, 1)
 RED = (1, 0, 0)
 OFF = (0, 0, 0)
 
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
+
 ready_event = Event()
 
 def play_response(category):
@@ -57,6 +74,7 @@ def play_response(category):
         "compost": "compost",
         "poubelle": "dechets",
         "dechets": "dechets",
+        "autre": "autre",
         "bac_plein": "bac_plein",
         "erreur": "erreur_detection",
         "merci": "merci",
@@ -132,6 +150,82 @@ def upload_image(image_path, retry=False):
 
     return response
 
+def get_distance():
+    GPIO.output(TRIG, False)
+    time.sleep(0.0002)
+
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, False)
+
+    pulse_start = time.time()
+    pulse_end = time.time()
+
+    timeout = time.time() + 1
+
+    while GPIO.input(ECHO) == 0:
+        pulse_start = time.time()
+        if pulse_start > timeout:
+            return None
+
+    while GPIO.input(ECHO) == 1:
+        pulse_end = time.time()
+        if pulse_end > timeout:
+            return None
+
+    pulse_duration = pulse_end - pulse_start
+    distance = pulse_duration * 17150
+    return round(distance, 1)
+
+
+def bin_monitor():
+    current_bin = None
+    start_time = None
+    full_reported = False
+
+    while True:
+        distance = get_distance()
+        print(distance)
+
+        if distance is None:
+            time.sleep(0.2)
+            continue
+
+        detected_bin = None
+
+        for name, (min_d, max_d) in BIN_RANGES.items():
+            if min_d <= distance <= max_d:
+                detected_bin = name
+                break
+
+        if detected_bin:
+            if detected_bin == current_bin:
+                if start_time and (time.time() - start_time >= FULL_DURATION):
+                    if not full_reported:
+                        print(f"Bac {detected_bin} plein !")
+                        full_reported = True
+                        try:
+
+                            payload = {
+                            "isFull": True
+                                } 
+                            URL_ =  f"https://iotbackend-4ufq.onrender.com/api/notif/{detected_bin}"
+                            cat = requests.post(URL_, json=payload)
+                            cat.raise_for_status()
+                        except Exception as e:
+                            print("erreur du bac plein")
+
+            else:
+                current_bin = detected_bin
+                start_time = time.time()
+                full_reported = False
+        else:
+            current_bin = None
+            start_time = None
+            full_reported = False
+
+        time.sleep(0.2)
+
 def reset_system():
     time.sleep(10)
 
@@ -170,19 +264,15 @@ def take_and_send_photo():
         status_led.off()
 
         category = response.text.strip().lower()
-        
+
 
         payload = {
         "categorieAnalyser": category
             } 
-        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"  
+        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"
         cat = requests.post(URL_, json=payload)
-        
-        cat.raise_for_status()
 
-        data = cat.json()
-        print(data)
-        auth_token = data.get("accessToken")
+        cat.raise_for_status()
 
         if category == "recyclage":
             result_led.color = GREEN
@@ -193,8 +283,15 @@ def take_and_send_photo():
         else:
             result_led.color = RED
 
+        print("avant play response")
         play_response(category)
         play_response("merci")
+        
+        try:
+            os.remove(image_path)
+            print(f"Photo supprimée: {image_path}")
+        except Exception as e:
+            print(f"Erreur suppression photo: {e}")
 
         Thread(target=reset_system, daemon=True).start()
 
@@ -204,6 +301,7 @@ def take_and_send_photo():
         result_led.color = RED
         Thread(target=reset_system, daemon=True).start()
 
+Thread(target=bin_monitor, daemon=True).start()
 
 button.when_pressed = take_and_send_photo
 
@@ -212,5 +310,7 @@ print("Appuyez sur le buton pour prendre une photo.")
 # Message d'introduction au démarrage
 play_response("introduction")
 
-# mieux qu'un while loop
-pause()
+try:
+    pause()
+finally:
+    GPIO.cleanup()
