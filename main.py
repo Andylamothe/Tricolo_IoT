@@ -55,6 +55,7 @@ AUDIO_MESSAGES = {
     "compost": "compost",
     "poubelle": "dechets",
     "dechets": "dechets",
+    "autre": "autre",
     "bac_plein": "bac_plein",
     "erreur": "erreur_detection",
     "merci": "merci",
@@ -79,9 +80,6 @@ auth_token = None
 ready_event = Event()
 audio_player = AudioPlayer()
 
-# ============================================================================
-# FUNCTIONS
-# ============================================================================
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
@@ -238,10 +236,14 @@ def take_and_send_photo():
         result_led.color = COLORS['red']
         play_audio("erreur")
         Thread(target=reset_system, daemon=True).start()
+    finally:
+        if os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+                print(f"[SYSTEME] Photo supprimée: {image_path}")
+            except Exception as e:
+                print(f"[ERREUR] Suppression photo échouée: {e}")
 
-# ============================================================================
-# MAIN
-# ============================================================================
 # ============================================================================
 # MAIN
 # ============================================================================
