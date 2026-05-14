@@ -165,4 +165,4 @@ Le système gère notamment les messages suivants :
 
 ## Licence
 
-Ce projet est distribué sous licence MIT. Voir `/home/runner/work/Tricolo_IoT/Tricolo_IoT/LICENSE`.
+Ce projet est distribué sous licence MIT. Voir [LICENSE](LICENSE).
