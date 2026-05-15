@@ -1,5 +1,5 @@
 from gpiozero import Button, RGBLED
-from picamera2 import Picamera2
+import cv2
 from datetime import datetime
 import requests
 import time
@@ -43,9 +43,10 @@ button = Button(BUTTON, pull_up=True, bounce_time=0.1)
 status_led = RGBLED(*STATUS_LED, active_high=False)
 result_led = RGBLED(*RESULT_LED, active_high=False)
 
-camera = Picamera2()
-camera.configure(camera.create_still_configuration())
-camera.start()
+camera = cv2.VideoCapture(0)
+
+if not camera.isOpened():
+    raise Exception("Impossible d'ouvrir la webcam")
 time.sleep(2)  # laisser camera se reveiller
 
 auth_token = None  # stocké après login
@@ -62,6 +63,8 @@ GPIO.setup(TRIG, GPIO.OUT)
 GPIO.setup(ECHO, GPIO.IN)
 
 ready_event = Event()
+
+processing_event = Event()
 
 def play_response(category):
     """Joue un message audio selon la catégorie backend."""
@@ -86,16 +89,30 @@ def play_response(category):
     print(f"[SYSTEME] Lecture du message: {message_file}")
     player.play(message_file)
 
-def ready_animation():
-    while not ready_event.is_set():
-        status_led.color = BLUE
-        time.sleep(1)
-        status_led.color = OFF
-        time.sleep(0.5)
+current_status = "ready"
+
+def status_manager():
+    while True:
+        global current_status
+
+        if current_status == "ready":
+            status_led.color = BLUE
+            time.sleep(1)
+            status_led.off()
+            time.sleep(0.5)
+
+        elif current_status == "processing":
+            status_led.color = ORANGE
+            time.sleep(0.4)
+            status_led.off()
+            time.sleep(0.4)
+
+        elif current_status == "off":
+            status_led.off()
+            time.sleep(0.1)
 
 ready_event.clear()
-Thread(target=ready_animation, daemon=True).start()
-
+Thread(target=status_manager, daemon=True).start()
 
 def login():
     global auth_token
@@ -227,32 +244,34 @@ def bin_monitor():
         time.sleep(0.2)
 
 def reset_system():
-    time.sleep(10)
+    global current_status
 
     result_led.off()
     status_led.off()
 
-    ready_event.clear()
-    Thread(target=ready_animation, daemon=True).start()
+    current_status = "ready"
 
     print("Système réinitialisé. Prêt pour le prochain objet.")
 
 def take_and_send_photo():
-    global auth_token
+    global auth_token, current_status
     print("Bouton appuyé, prise de photo en cours...")
 
-    ready_event.set()
+    current_status = "processing"
 
     result_led.off()
-
-    status_led.color = ORANGE
 
     play_response("attente")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     image_path = f"{IMAGE_DIR}/photo_{timestamp}.jpg"
 
-    camera.capture_file(image_path)
+    ret, frame = camera.read()
+
+    if not ret:
+        raise Exception("Erreur capture webcam")
+
+    cv2.imwrite(image_path, frame)
 
     print(f"Uploading {image_path}...")
 
@@ -261,7 +280,6 @@ def take_and_send_photo():
 
         print("Upload status:", response.status_code)
         print("Server response:", response.text)
-        status_led.off()
 
         category = response.text.strip().lower()
 
@@ -273,6 +291,9 @@ def take_and_send_photo():
         cat = requests.post(URL_, json=payload)
 
         cat.raise_for_status()
+
+        current_status = "off"
+        status_led.off()
 
         if category == "recyclage":
             result_led.color = GREEN
