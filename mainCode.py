@@ -51,6 +51,7 @@ time.sleep(2)  # laisser camera se reveiller
 
 auth_token = None  # stocké après login
 
+WHITE = (1, 1, 1)
 BLUE = (0, 0, 1)
 ORANGE = (1, 0.5, 0)
 GREEN = (0, 1, 0)
@@ -102,7 +103,7 @@ def status_manager():
             time.sleep(0.5)
 
         elif current_status == "processing":
-            status_led.color = ORANGE
+            status_led.color = WHITE
             time.sleep(0.4)
             status_led.off()
             time.sleep(0.4)
