@@ -1,128 +1,337 @@
-from tts import TextToSpeechGenerator, AudioPlayer
+from gpiozero import Button, RGBLED
+import cv2
+from datetime import datetime
+import requests
+import time
+import os
+from signal import pause
+from threading import Thread, Event
+from tts import AudioPlayer
+import RPi.GPIO as GPIO
 
-# Messages du système Tricolo
-MESSAGES = {
-    "introduction": (
-        "Bienvenue sur Tricolo, le système intelligent de tri des déchets. "
-        "Appuyez sur le bouton et présentez votre déchet devant la caméra."
-    ),
-    "recyclage": (
-        "Ce déchet va dans le bac de recyclage. "
-        "Merci de contribuer à la protection de l'environnement."
-    ),
-    "compost": (
-        "Ce déchet va dans le bac à compost. "
-        "Parfait pour nourrir la terre."
-    ),
-    "dechets": (
-        "Ce déchet va dans le bac des déchets ordinaires. "
-        "Merci pour votre participation."
-    ),
-    "autre": (
-        "Ce déchet ne va dans aucun des bacs présents à votre droite. "
-        "Merci pour votre participation."
-    ),
-    "bac_plein": (
-        "Attention, le bac est plein. "
-        "Veuillez contacter le service d'entretien."
-    ),
-    "erreur_detection": (
-        "Désolé, je n'ai pas pu identifier votre déchet. "
-        "Veuillez réessayer en le positionnant mieux devant la caméra."
-    ),
-    "attente": (
-        "Analyse en cours, veuillez patienter."
-    ),
-    "merci": (
-        "Merci d'utiliser Tricolo. À bientôt!"
-    )
+
+BUTTON = 12
+
+STATUS_LED = (16, 20, 21) #R,G,B
+RESULT_LED = (5, 6, 13) #R,G,B
+
+TRIG = 23
+ECHO = 24
+
+SPEED_OF_SOUND = 34300  # cm/s
+FULL_DURATION = 10
+
+BIN_RANGES = {
+    "recyclabe": (10, 40),
+    "compost": (41, 70),
+    "poubelle": (71, 100),
 }
 
+UPLOAD_URL = "https://iotbackend-4ufq.onrender.com/api/upload-image"
+LOGIN_URL = "https://iotbackend-4ufq.onrender.com/api/login"
+CATEGORIE_URL = "https://iotbackend-4ufq.onrender.com/api/jeter/"
+IMAGE_DIR = "photos"
 
-def generate_all_messages():
-    """Génère tous les messages audio du projet."""
-    print("=" * 60)
-    print("Génération des messages audio Tricolo")
-    print("=" * 60 + "\n")
-    
-    generator = TextToSpeechGenerator(voice='fr-FR-DeniseNeural')
-    
-    for name, text in MESSAGES.items():
-        print(f"[{name}] {text}")
-        generator.save(text, name)
-    
-    print("Tous les messages ont été générés!\n")
+USERNAME = "test"
+PASSWORD = "test"
 
+
+os.makedirs(IMAGE_DIR, exist_ok=True)
+
+button = Button(BUTTON, pull_up=True, bounce_time=0.1)
+
+status_led = RGBLED(*STATUS_LED, active_high=False)
+result_led = RGBLED(*RESULT_LED, active_high=False)
+
+camera = cv2.VideoCapture(0)
+
+if not camera.isOpened():
+    raise Exception("Impossible d'ouvrir la webcam")
+time.sleep(2)  # laisser camera se reveiller
+
+auth_token = None  # stocké après login
+
+WHITE = (1, 1, 1)
+BLUE = (0, 0, 1)
+ORANGE = (1, 0.5, 0)
+GREEN = (0, 1, 0)
+PURPLE = (1, 0, 1)
+RED = (1, 0, 0)
+OFF = (0, 0, 0)
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(TRIG, GPIO.OUT)
+GPIO.setup(ECHO, GPIO.IN)
+
+ready_event = Event()
+processing_event = Event()
 
 def play_response(category):
-    """
-    Joue un message audio en fonction de la réponse du backend.
-    
-    Args:
-        category (str): Catégorie retournée par le backend
-            Options: 'RECYCLAGE', 'COMPOST', 'DECHETS', 'AUTRE', 'BAC_PLEIN', 'ERREUR'
-    """
+    """Joue un message audio selon la catégorie backend."""
     player = AudioPlayer()
-    
-    # Mapping des catégories vers les fichiers audio
+
     category_map = {
-        'RECYCLAGE': 'recyclage',
-        'COMPOST': 'compost',
-        'DECHETS': 'dechets',
-        'AUTRE': 'autre',
-        'BAC_PLEIN': 'bac_plein',
-        'ERREUR': 'erreur_detection',
-        'ATTENTE': 'attente',
-        'MERCI': 'merci',
-        'INTRODUCTION': 'introduction'
+        "introduction": "introduction",
+        "attente": "attente",
+        "recyclage": "recyclage",
+        "compost": "compost",
+        "poubelle": "dechets",
+        "dechets": "dechets",
+        "autre": "autre",
+        "bac_plein": "bac_plein",
+        "erreur": "erreur_detection",
+        "merci": "merci",
     }
-    
-    # Convertir en majuscules et chercher le message
-    category_upper = category.upper()
-    
-    if category_upper in category_map:
-        message_file = category_map[category_upper]
-        print(f"\n[SYSTEME] Catégorie détectée: {category}")
-        print(f"[SYSTEME] Lecture du message: {message_file}")
-        player.play(message_file)
-    else:
-        print(f"[ERREUR] Catégorie inconnue: {category}")
-        print(f"[INFO] Catégories valides: {', '.join(category_map.keys())}")
+
+    key = (category or "").strip().lower()
+    message_file = category_map.get(key, "erreur_detection")
+    print(f"[SYSTEME] Catégorie détectée: {key}")
+    print(f"[SYSTEME] Lecture du message: {message_file}")
+    player.play(message_file)
+
+current_status = "ready"
+
+def status_manager():
+    while True:
+        global current_status
+
+        if current_status == "ready":
+            status_led.color = BLUE
+            time.sleep(1)
+            status_led.off()
+            time.sleep(0.5)
+
+        elif current_status == "processing":
+            status_led.color = WHITE
+            time.sleep(0.4)
+            status_led.off()
+            time.sleep(0.4)
+
+        elif current_status == "off":
+            status_led.off()
+            time.sleep(0.1)
+
+ready_event.clear()
+Thread(target=status_manager, daemon=True).start()
+
+def login():
+    global auth_token
+    print("Token non trouvé, login...")
+
+    payload = {
+        "username": USERNAME,
+        "password": PASSWORD
+    }
+
+    r = requests.post(LOGIN_URL, json=payload, timeout=30)
+    r.raise_for_status()
+
+    data = r.json()
+    print(data)
+    auth_token = data.get("accessToken")
+
+    if not auth_token:
+        raise Exception("Aucun token trouvé du server")
+
+    print("Token recu")
 
 
-def simulate_backend_response(category):
-    """
-    Simule une réponse du backend et joue le message correspondant.
-    
-    Args:
-        category (str): Catégorie simulée du backend
-    """
-    print(f"\n{'='*60}")
-    print(f"Simulation de réponse backend: {category}")
-    print(f"{'='*60}")
-    play_response(category)
+def upload_image(image_path, retry=False):
+    global auth_token
+
+    headers = {}
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token}"
+
+    # pour ne pas laisser le fichier ouvert
+    with open(image_path, "rb") as img:
+        files = {
+            "image": ("photo.jpg", img, "image/jpeg")
+        }
+        response = requests.post(
+            UPLOAD_URL,
+            files=files,
+            headers=headers,
+            timeout=30
+        )
+
+    # verif erreur token
+    try:
+        message = response.json().get("message")
+    except ValueError:
+        message = None
+
+    if message in ("Token manquant", "Token invalide ou expiré") and not retry:
+        login()
+        return upload_image(image_path, retry=True)
+
+    return response
+
+def get_distance():
+    GPIO.output(TRIG, False)
+    time.sleep(0.0002)
+
+    GPIO.output(TRIG, True)
+    time.sleep(0.00001)
+    GPIO.output(TRIG, False)
+
+    pulse_start = time.time()
+    pulse_end = time.time()
+
+    timeout = time.time() + 1
+
+    while GPIO.input(ECHO) == 0:
+        pulse_start = time.time()
+        if pulse_start > timeout:
+            return None
+
+    while GPIO.input(ECHO) == 1:
+        pulse_end = time.time()
+        if pulse_end > timeout:
+            return None
+
+    pulse_duration = pulse_end - pulse_start
+    distance = pulse_duration * 17150
+    return round(distance, 1)
 
 
-def list_audio_files():
-    """Liste tous les fichiers audio."""
-    player = AudioPlayer()
-    player.list_files()
+def bin_monitor():
+    current_bin = None
+    start_time = None
+    full_reported = False
+
+    while True:
+        distance = get_distance()
+        print(distance)
+
+        if distance is None:
+            time.sleep(0.2)
+            continue
+
+        detected_bin = None
+
+        for name, (min_d, max_d) in BIN_RANGES.items():
+            if min_d <= distance <= max_d:
+                detected_bin = name
+                break
+
+        if detected_bin:
+            if detected_bin == current_bin:
+                if start_time and (time.time() - start_time >= FULL_DURATION):
+                    if not full_reported:
+                        print(f"Bac {detected_bin} plein !")
+                        full_reported = True
+                        try:
+
+                            payload = {
+                            "isFull": True
+                                } 
+                            URL_ =  f"https://iotbackend-4ufq.onrender.com/api/notif/{detected_bin}"
+                            cat = requests.post(URL_, json=payload)
+                            cat.raise_for_status()
+                        except Exception as e:
+                            print("erreur du bac plein")
+
+            else:
+                current_bin = detected_bin
+                start_time = time.time()
+                full_reported = False
+        else:
+            current_bin = None
+            start_time = None
+            full_reported = False
+
+        time.sleep(0.2)
+
+def reset_system():
+    global current_status
+
+    result_led.off()
+    status_led.off()
+
+    current_status = "ready"
+
+    print("Système réinitialisé. Prêt pour le prochain objet.")
+
+def take_and_send_photo():
+    global auth_token, current_status
+    print("Bouton appuyé, prise de photo en cours...")
+
+    current_status = "processing"
+
+    result_led.off()
+
+    play_response("attente")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    image_path = f"{IMAGE_DIR}/photo_{timestamp}.jpg"
+
+    ret, frame = camera.read()
+
+    if not ret:
+        raise Exception("Erreur capture webcam")
+
+    cv2.imwrite(image_path, frame)
+
+    print(f"Uploading {image_path}...")
+
+    try:
+        response = upload_image(image_path)
+
+        print("Upload status:", response.status_code)
+        print("Server response:", response.text)
+
+        category = response.text.strip().lower()
 
 
-if __name__ == '__main__':
-    print("Tricolo IoT System")
-    print("=" * 60 + "\n")
-    
-    # 1. Générer tous les messages (à exécuter une seule fois)
-    # generate_all_messages()
-    
-    # 2. Tester avec différentes catégories
-    # simulate_backend_response("RECYCLAGE")
-    # simulate_backend_response("COMPOST")
-    # simulate_backend_response("DECHETS")
-    # simulate_backend_response("AUTRE")
-    # simulate_backend_response("BAC_PLEIN")
-    # simulate_backend_response("ERREUR")
-    
-    # 3. Lister les fichiers disponibles
-    list_audio_files()
+        payload = {
+        "categorieAnalyser": category
+            } 
+        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"
+        cat = requests.post(URL_, json=payload)
+
+        cat.raise_for_status()
+
+        current_status = "off"
+        status_led.off()
+
+        if category == "recyclage":
+            result_led.color = GREEN
+        elif category == "compost":
+            result_led.color = ORANGE
+        elif category == "poubelle":
+            result_led.color = PURPLE
+        else:
+            result_led.color = RED
+
+        print("avant play response")
+        play_response(category)
+        play_response("merci")
+        
+        try:
+            os.remove(image_path)
+            print(f"Photo supprimée: {image_path}")
+        except Exception as e:
+            print(f"Erreur suppression photo: {e}")
+
+        Thread(target=reset_system, daemon=True).start()
+
+    except Exception as e:
+        print("Upload failed:", e)
+        status_led.off()
+        result_led.color = RED
+        Thread(target=reset_system, daemon=True).start()
+
+Thread(target=bin_monitor, daemon=True).start()
+
+button.when_pressed = take_and_send_photo
+
+print("Appuyez sur le buton pour prendre une photo.")
+
+# Message d'introduction au démarrage
+play_response("introduction")
+
+try:
+    pause()
+finally:
+    GPIO.cleanup()
