@@ -114,7 +114,7 @@ if __name__ == '__main__':
     print("=" * 60 + "\n")
     
     # 1. Générer tous les messages (à exécuter une seule fois)
-    # generate_all_messages()
+    generate_all_messages()
     
     # 2. Tester avec différentes catégories
     # simulate_backend_response("RECYCLAGE")
