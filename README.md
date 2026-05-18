@@ -1,250 +1,168 @@
-<img  width="231" height="123" alt="image" src="https://github.com/user-attachments/assets/390c512c-b817-48c5-b40b-649d19009e57" />
+# Tricolo IoT
 
-# Tricolo – Système IoT Intelligent de Triage des Déchets
+Système embarqué de tri des déchets basé sur Raspberry Pi, conçu pour guider l’utilisateur à l’aide d’un retour visuel et vocal après analyse d’une photo envoyée à un backend distant.
 
-##  Description du Projet
+## Vue d’ensemble
 
-**Tricolo** est un système IoT intelligent basé sur **Raspberry Pi 4**, conçu pour assister les utilisateurs dans le tri des déchets grâce à des **indications visuelles (LED)**, **sonores (feedback vocal)** et à une **collecte de données centralisée** accessible via une application mobile.
+Tricolo IoT pilote une station de tri interactive. Lorsqu’un utilisateur appuie sur un bouton physique, le Raspberry Pi capture une image du déchet, l’envoie à une API distante pour classification, puis restitue le résultat via :
 
-Le système détecte une interaction utilisateur, analyse le contexte (présence / état du bac), fournit un retour immédiat et transmet les données à un serveur web pour affichage dans un tableau de bord.
+- une LED d’état,
+- une LED de résultat,
+- un message audio préenregistré.
 
-Ce projet est réalisé dans un cadre **académique**, avec une architecture réaliste, modulaire et orientée IoT.
+Le projet couvre principalement la logique embarquée côté Raspberry Pi ainsi que les utilitaires permettant de générer et lire les fichiers audio du système.
 
----
+## Fonctionnement
 
-##  Objectifs du Projet
+1. Le système démarre et signale son état de disponibilité avec une animation LED bleue.
+2. L’utilisateur appuie sur le bouton physique.
+3. Le Raspberry Pi affiche un état d’attente, joue un message audio, puis capture une photo.
+4. La photo est envoyée au backend distant après authentification.
+5. Le backend retourne une catégorie de tri.
+6. Le système :
+   - allume la LED de résultat avec la couleur associée,
+   - joue le message audio correspondant,
+   - envoie une requête complémentaire au endpoint `/jeter/{categorie}`.
+7. La photo temporaire est supprimée et le système se réinitialise automatiquement.
 
-- Guider l’utilisateur vers le bon bac (recyclage, compost, déchets)
-- Fournir un feedback clair et immédiat (LED + audio)
-- Détecter si un bac est plein
-- Envoyer les données vers un backend en temps réel
-- Visualiser les statistiques dans une application mobile
-- Réduire les erreurs de tri des déchets
+## Architecture applicative
 
----
+### Composants principaux
 
-##  Fonctionnalités Principales
+- **`main.py`** : point d’entrée de l’application embarquée, orchestration du bouton, des LED, de la caméra, de l’authentification et des appels réseau.
+- **`TTS_MainCode.py`** : utilitaire pour générer et tester les messages audio du projet.
+- **`tts/generator.py`** : génération de fichiers MP3 à partir de texte via Edge TTS.
+- **`tts/player.py`** : lecture locale des fichiers audio présents dans `audio/`.
+- **`audio/`** : bibliothèque des messages vocaux utilisés par le système.
 
-| Fonction | Description |
-|--------|------------|
-| Interaction utilisateur | Bouton physique |
-| Feedback visuel | LED RGB |
-| Feedback vocal | Haut-parleur |
-| Détection de niveau | Capteur ultrasonique |
-| Communication réseau | WebSocket + REST |
-| Collecte de données | Statistiques de tri |
-| Dashboard | Application mobile |
-
----
-
-##  Spécifications Techniques
-
-###  Matériel Utilisé
-
-| Composant | Quantité | Rôle |
-|---------|----------|------|
-| Raspberry Pi 4 (2GB ou +) | 1 | Unité centrale |
-| LED RGB keystudios | 2 | Indication d’état et de bac |
-| caméra pi | 1 | prendre en photo le déchet |
-| Capteur ultrasonique (HC-SR04) | 1 | Détection bac plein |
-| Bouton poussoir | 1 | Déclenchement utilisateur |
-| Haut-parleur USB | 1 | Feedback vocal |
-| Powerbank USB | 1 | Alimentation portable |
-| Carte microSD (16 GB min) | 1 | OS + application |
-
----
-
-###  Capacités du Raspberry Pi 4
-
-| Ressource | Détails |
-|---------|--------|
-| CPU | Quad-core ARM Cortex-A72 |
-| RAM | 2 GB ou plus |
-| GPIO | 40 broches |
-| Réseau | Wi-Fi + Ethernet |
-| USB | USB 2.0 / 3.0 |
-| Audio | HDMI / USB |
-
- Le Raspberry Pi 4 est largement suffisant pour ce projet.
-
----
-
-##  Mapping GPIO (Configuration Recommandée)
-
-| Composant | GPIO |
-|---------|------|
-| LED RGB #1 | GPIO 17 |
-| LED RGB #2 | GPIO 27 |
-| LED RGB #3 | GPIO 22 |
-| LED RGB #4 | GPIO 23 |
-| LED RGB #5 | GPIO 24 |
-| Ultrasonic Trigger | GPIO 5 |
-| Ultrasonic Echo | GPIO 6 |
-| Bouton | GPIO 18 |
-| Audio | USB (aucun GPIO) |
-
- Le signal **Echo** du capteur ultrasonique doit passer par un **diviseur de tension** (5V → 3.3V).
-
----
-
-##  Logiciels Utilisés
-
-| Logiciel | Rôle |
-|--------|------|
-| Raspberry Pi OS | Système d’exploitation |
-| Python 3.9+ | Logique embarquée |
-| RPi.GPIO | Gestion des GPIO |
-| WebSocket | Communication temps réel |
-| REST API | Backend |
-| pyttsx3 | Synthèse vocale |
-| PostgreSQL / SQLite | Stockage des données |
-
----
-
-
-## 📐 Diagramme UML – Architecture du Système
-
-
+### Flux technique
 
 ```mermaid
-graph TD
-    User[Utilisateur]
-
-    Button[Bouton tactile]
-    Ultrasonic[Capteur ultrasonique]
-    Camera[Caméra]
-
-    Pi[Raspberry Pi 4]
-    LED[LED RGB]
-    Speaker[Haut-parleur]
-    WSClient[Client WebSocket]
-    RESTClient[Client API REST]
-
-    Server[Serveur Web / Backend]
-    API[API REST]
-    WS[Serveur WebSocket]
-    AI[API IA externe]
-    DB[(Base de données)]
-
-    Mobile[Application mobile / Dashboard]
-
-    %% Interaction utilisateur
-    User --> Button
-    User --> Camera
-
-    %% Capteurs vers Pi
-    Button --> Pi
-    Ultrasonic --> Pi
-    Camera --> Pi
-
-    %% Modules Pi
-    Pi --> LED
-    Pi --> Speaker
-    Pi --> WSClient
-    Pi --> RESTClient
-
-    %% Communication réseau
-    RESTClient --> API
-    WSClient --> WS
-
-    %% Backend logique
-    API --> Server
-    WS --> Server
-    Server --> AI
-    Server --> DB
-
-    %% Visualisation
-    DB --> Mobile
-
-
+flowchart LR
+    U[Utilisateur] --> B[Bouton]
+    B --> RPI[Raspberry Pi]
+    RPI --> CAM[Caméra Pi]
+    RPI --> API[Backend HTTP]
+    API --> RPI
+    RPI --> LEDS[LED d'état et LED de résultat]
+    RPI --> AUDIO[Messages audio]
 ```
 
----
+## Matériel ciblé
 
-##  Communication Pi ↔ Serveur
+Le code est conçu pour une exécution sur Raspberry Pi avec des composants matériels connectés :
 
-### Architecture retenue
+- Raspberry Pi
+- bouton poussoir
+- 2 LED RGB
+- caméra compatible `Picamera2`
+- système audio capable de lire les fichiers MP3
 
-| Type | Utilisation |
-|----|------------|
-| REST API | Envoi de données (scan, état bac) |
-| WebSocket | Réponses en temps réel |
-| Format | JSON |
+## Dépendances et prérequis
 
-### Exemple de message envoyé
+### Logiciels
 
-```json
-{
-  "event": "waste_detected",
-  "category": "recyclage",
-  "timestamp": "2026-02-04T20:15:00"
-}
-```
-## 📂 Structure du Projet
+- Python 3
+- Raspberry Pi OS ou distribution Linux compatible GPIO/caméra
+- `mpg123` pour la lecture audio sous Linux
 
-```text
-Tricolo/
-├── main.py                 # Point d’entrée du système embarqué
-├── config.json             # Configuration GPIO, réseau et paramètres généraux
-├── requirements.txt        # Dépendances Python
-├── modules/
-│   ├── gpio_manager.py     # Gestion centralisée des GPIO
-│   ├── leds.py             # Contrôle des LED RGB (feedback visuel)
-│   ├── sensors.py          # Capteur ultrasonique et bouton
-│   ├── audio.py            # Feedback vocal (haut-parleur)
-│   ├── websocket_client.py # Client WebSocket vers le backend
-│   └── stats.py            # Envoi des statistiques et événements
-├── backend/
-│   ├── api.py              # API REST (réception des données du Raspberry Pi)
-│   ├── websocket.py        # Serveur WebSocket (communication temps réel)
-│   └── database.py         # Gestion de la base de données
-└── tests/
-    ├── test_gpio.py        # Tests des GPIO
-    └── test_audio.py       # Tests audio
-```
+### Bibliothèques Python utilisées
 
----
+Le dépôt fait actuellement référence aux bibliothèques suivantes :
 
-##  Utilisation
+- `gpiozero`
+- `picamera2`
+- `requests`
+- `python-dotenv`
+- `edge-tts` *(nécessaire uniquement pour régénérer les fichiers audio)*
 
-### Démarrage du système embarqué
+## Configuration
+
+La configuration est actuellement définie directement dans `main.py` :
+
+- broches GPIO,
+- URLs du backend,
+- identifiants de connexion,
+- répertoire temporaire des photos,
+- correspondances couleurs/catégories,
+- correspondances catégories/messages audio.
+
+Avant un déploiement réel, il est recommandé d’adapter ces constantes à votre environnement matériel et réseau.
+
+## Utilisation
+
+### Lancer le système embarqué
 
 ```bash
 python3 main.py
-Tests individuels
-python3 tests/test_gpio.py
-python3 tests/test_audio.py
 ```
-##  Limites du Projet
-Reconnaissance limitée aux catégories définies
 
-Nécessite une connexion réseau active
+### Générer ou tester les fichiers audio
 
-Prototype non destiné à un usage industriel ou commercial
+```bash
+python3 TTS_MainCode.py
+```
 
-##  Sécurité et Confidentialité
-Aucune donnée personnelle stockée
+## Structure du dépôt
 
-Communications chiffrées via HTTPS / WSS
+```text
+Tricolo_IoT/
+├── main.py
+├── TTS_MainCode.py
+├── README.md
+├── LICENSE
+├── audio/
+│   ├── attente.mp3
+│   ├── bac_plein.mp3
+│   ├── compost.mp3
+│   ├── dechets.mp3
+│   ├── erreur_detection.mp3
+│   ├── introduction.mp3
+│   ├── merci.mp3
+│   └── recyclage.mp3
+└── tts/
+    ├── __init__.py
+    ├── generator.py
+    └── player.py
+```
 
-Données utilisées uniquement à des fins statistiques et pédagogiques
+## Comportement fonctionnel actuel
 
-##  Roadmap
-Ajout d’un écran d’affichage
+### Couleurs de retour
 
-Mode hors-ligne avec synchronisation différée
+- **Vert** : recyclage
+- **Orange** : compost
+- **Violet** : poubelle / déchets ordinaires
+- **Rouge** : erreur ou catégorie non reconnue
 
-Ajout de nouvelles catégories
+### Messages audio prévus
 
-Amélioration du dashboard mobile
+Le système gère notamment les messages suivants :
 
-Intégration IA (optionnelle)
+- introduction,
+- attente,
+- recyclage,
+- compost,
+- déchets,
+- autre,
+- bac plein,
+- erreur de détection,
+- remerciement.
 
-##  Licence
-Projet distribué sous licence MIT.
+## Limites connues
 
-##  Support
-Pour toute question ou problème, veuillez ouvrir une issue GitHub sur le dépôt du projet.
+- La classification des déchets dépend entièrement d’un backend externe.
+- La configuration n’est pas encore externalisée dans un fichier dédié.
+- Le projet est centré sur le prototype embarqué ; il n’inclut pas le code du backend distant.
+- Le fonctionnement complet nécessite l’accès au matériel Raspberry Pi concerné.
 
+## Pistes d’amélioration
 
+- externaliser la configuration dans un fichier ou des variables d’environnement,
+- ajouter une stratégie de reprise réseau plus robuste,
+- formaliser l’installation via un fichier de dépendances,
+- ajouter des tests automatisés pour la logique applicative.
 
+## Licence
+
+Ce projet est distribué sous licence MIT. Voir [LICENSE](LICENSE).
