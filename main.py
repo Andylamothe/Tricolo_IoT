@@ -1,6 +1,9 @@
+# =========================================================
+# IMPORTS
+# =========================================================
+
 from gpiozero import Button, RGBLED
 import cv2
-from picamera2 import Picamera2
 from datetime import datetime
 import requests
 import time
@@ -11,6 +14,10 @@ from tts import AudioPlayer
 import RPi.GPIO as GPIO
 
 
+# =========================================================
+# GPIO CONFIGURATION
+# =========================================================
+
 BUTTON = 12
 
 STATUS_LED = (16, 20, 21) #R,G,B
@@ -18,6 +25,11 @@ RESULT_LED = (5, 6, 13) #R,G,B
 
 TRIG = 23
 ECHO = 24
+
+
+# =========================================================
+# ULTRASONIC SENSOR CONFIG
+# =========================================================
 
 SPEED_OF_SOUND = 34300  # cm/s
 FULL_DURATION = 10
@@ -28,29 +40,47 @@ BIN_RANGES = {
     "poubelle": (71, 100),
 }
 
+
+# =========================================================
+# API CONFIGURATION
+# =========================================================
+
 UPLOAD_URL = "https://iotbackend-4ufq.onrender.com/api/upload-image"
 LOGIN_URL = "https://iotbackend-4ufq.onrender.com/api/login"
-CATEGORIE_URL = "https://iotbackend-4ufq.onrender.com/api/jeter/"
-IMAGE_DIR = "photos"
 
 USERNAME = "test"
 PASSWORD = "test"
 
 
+# =========================================================
+# FILE CONFIGURATION
+# =========================================================
+
+IMAGE_DIR = "photos"
 os.makedirs(IMAGE_DIR, exist_ok=True)
+
+
+# =========================================================
+# HARDWARE INITIALIZATION
+# =========================================================
 
 button = Button(BUTTON, pull_up=True, bounce_time=0.1)
 
 status_led = RGBLED(*STATUS_LED, active_high=False)
 result_led = RGBLED(*RESULT_LED, active_high=False)
 
+# initialisation de la camera
 camera = cv2.VideoCapture(0)
 
 if not camera.isOpened():
     raise Exception("Impossible d'ouvrir la webcam")
+
 time.sleep(2)  # laisser camera se reveiller
 
-auth_token = None  # stocké après login
+
+# =========================================================
+# LED COLORS
+# =========================================================
 
 WHITE = (1, 1, 1)
 BLUE = (0, 0, 1)
@@ -60,12 +90,30 @@ PURPLE = (1, 0, 1)
 RED = (1, 0, 0)
 OFF = (0, 0, 0)
 
+
+# =========================================================
+# GPIO SETUP
+# =========================================================
+
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(TRIG, GPIO.OUT)
 GPIO.setup(ECHO, GPIO.IN)
 
+
+# =========================================================
+# GLOBAL VARIABLES
+# =========================================================
+
+auth_token = None  # stocké après login
+current_status = "ready"
+
 ready_event = Event()
 processing_event = Event()
+stop_event = Event()
+
+# =========================================================
+# TEXT-TO-SPEECH
+# =========================================================
 
 def play_response(category):
     """Joue un message audio selon la catégorie backend."""
@@ -90,18 +138,24 @@ def play_response(category):
     print(f"[SYSTEME] Lecture du message: {message_file}")
     player.play(message_file)
 
-current_status = "ready"
+
+# =========================================================
+# STATUS LED THREAD
+# =========================================================
 
 def status_manager():
-    while True:
-        global current_status
+    global current_status
 
+    while not stop_event.is_set():
+
+        # Prêt = flash bleu lent
         if current_status == "ready":
             status_led.color = BLUE
             time.sleep(1)
             status_led.off()
             time.sleep(0.5)
 
+        # En marche = flash blanc rapide
         elif current_status == "processing":
             status_led.color = WHITE
             time.sleep(0.4)
@@ -112,11 +166,19 @@ def status_manager():
             status_led.off()
             time.sleep(0.1)
 
-ready_event.clear()
-Thread(target=status_manager, daemon=True).start()
+status_thread = Thread(target=status_manager)
+status_thread.start()
+
+
+# =========================================================
+# AUTHENTIFICATION
+# =========================================================
 
 def login():
+    # cherche token JWT du backend
+
     global auth_token
+    
     print("Token non trouvé, login...")
 
     payload = {
@@ -124,11 +186,16 @@ def login():
         "password": PASSWORD
     }
 
-    r = requests.post(LOGIN_URL, json=payload, timeout=30)
-    r.raise_for_status()
+    response = requests.post(
+        LOGIN_URL,
+        json=payload,
+        timeout=30
+    )
+    
+    response.raise_for_status()
 
-    data = r.json()
-    print(data)
+    data = response.json()
+
     auth_token = data.get("accessToken")
 
     if not auth_token:
@@ -137,18 +204,27 @@ def login():
     print("Token recu")
 
 
+# =========================================================
+# ENVOIE DE L'IMAGE
+# =========================================================
+
 def upload_image(image_path, retry=False):
+    # envoie l'image au backend
+    # reéssaie si token expiré
     global auth_token
 
     headers = {}
+
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
     # pour ne pas laisser le fichier ouvert
     with open(image_path, "rb") as img:
+
         files = {
             "image": ("photo.jpg", img, "image/jpeg")
         }
+        
         response = requests.post(
             UPLOAD_URL,
             files=files,
@@ -159,6 +235,7 @@ def upload_image(image_path, retry=False):
     # verif erreur token
     try:
         message = response.json().get("message")
+
     except ValueError:
         message = None
 
@@ -168,7 +245,14 @@ def upload_image(image_path, retry=False):
 
     return response
 
+
+# =========================================================
+# CAPTEUR ULTRASONIQUE
+# =========================================================
+
 def get_distance():
+    # Mesure distance des bacs
+
     GPIO.output(TRIG, False)
     time.sleep(0.0002)
 
@@ -181,29 +265,40 @@ def get_distance():
 
     timeout = time.time() + 1
 
+    # Début de l'echo
     while GPIO.input(ECHO) == 0:
         pulse_start = time.time()
         if pulse_start > timeout:
             return None
-
+        
+    # Fin de l'echo
     while GPIO.input(ECHO) == 1:
         pulse_end = time.time()
         if pulse_end > timeout:
             return None
 
     pulse_duration = pulse_end - pulse_start
+
     distance = pulse_duration * 17150
+
     return round(distance, 1)
 
 
+# =========================================================
+# DÉTECTION NIVEAU DE REMPLISSAGE DES BACS
+# =========================================================
+
 def bin_monitor():
+    # Verifie si bacs sont pleins
+
     current_bin = None
     start_time = None
     full_reported = False
 
-    while True:
+    while not stop_event.is_set():
+
         distance = get_distance()
-        print(distance)
+        print(distance) # Spam distance en cm dans la console
 
         if distance is None:
             time.sleep(0.2)
@@ -211,40 +306,64 @@ def bin_monitor():
 
         detected_bin = None
 
+        # Determine c'est quel bac
         for name, (min_d, max_d) in BIN_RANGES.items():
             if min_d <= distance <= max_d:
                 detected_bin = name
                 break
 
         if detected_bin:
-            if detected_bin == current_bin:
-                if start_time and (time.time() - start_time >= FULL_DURATION):
-                    if not full_reported:
-                        print(f"Bac {detected_bin} plein !")
-                        full_reported = True
-                        try:
 
+            # Si toujours même bac
+            if detected_bin == current_bin:
+
+                if start_time and (time.time() - start_time >= FULL_DURATION):
+
+                    if not full_reported:
+
+                        print(f"Bac {detected_bin} plein !")
+
+                        full_reported = True
+
+                        try:
                             payload = {
-                            "isFull": True
-                                } 
+                                "isFull": True
+                            }
+
                             URL_ =  f"https://iotbackend-4ufq.onrender.com/api/notif/{detected_bin}"
-                            cat = requests.post(URL_, json=payload)
-                            cat.raise_for_status()
+                            
+                            response = requests.post(
+                                URL_,
+                                json=payload
+                            
+                            )
+                            response.raise_for_status()
+
                         except Exception as e:
-                            print("erreur du bac plein")
+                            print("erreur du bac plein", e)
 
             else:
+                # Nouveau bac détecté
                 current_bin = detected_bin
                 start_time = time.time()
                 full_reported = False
+
         else:
+            # Au aucun bac détecté
             current_bin = None
             start_time = None
             full_reported = False
 
         time.sleep(0.2)
 
+
+# =========================================================
+# RÉINITIALISATION DU SYSTÈME
+# =========================================================
+
 def reset_system():
+    # Reset les LED et retourne le status à ready 
+
     global current_status
 
     result_led.off()
@@ -253,6 +372,11 @@ def reset_system():
     current_status = "ready"
 
     print("Système réinitialisé. Prêt pour le prochain objet.")
+
+
+# =========================================================
+# FONCTION PRINCIPALE DE PHOTO
+# =========================================================
 
 def take_and_send_photo():
     global auth_token, current_status
@@ -323,7 +447,8 @@ def take_and_send_photo():
         result_led.color = RED
         Thread(target=reset_system, daemon=True).start()
 
-Thread(target=bin_monitor, daemon=True).start()
+bin_thread = Thread(target=bin_monitor)
+bin_thread.start()
 
 button.when_pressed = take_and_send_photo
 
@@ -334,5 +459,19 @@ play_response("introduction")
 
 try:
     pause()
+
+except KeyboardInterrupt:
+    print("\nArrêt du programme...")
+
 finally:
+    stop_event.set()
+
+    status_thread.join()
+    bin_thread.join()
+
+    status_led.off()
+    result_led.off()
+
+    camera.release()
+
     GPIO.cleanup()
