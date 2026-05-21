@@ -298,7 +298,7 @@ def bin_monitor():
     while not stop_event.is_set():
 
         distance = get_distance()
-        print(distance) # Spam distance en cm dans la console
+        #print(distance) # Spam distance en cm dans la console
 
         if distance is None:
             time.sleep(0.2)
@@ -408,14 +408,23 @@ def take_and_send_photo():
 
         category = response.text.strip().lower()
 
+        if category == "autre": 
+            payload = {
+            "categorieAnalyser": "autre"
+                } 
+            URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/Autre"
+            cat = requests.post(URL_, json=payload)
 
-        payload = {
-        "categorieAnalyser": category
-            } 
-        URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"
-        cat = requests.post(URL_, json=payload)
+            cat.raise_for_status()
 
-        cat.raise_for_status()
+        else :
+            payload = {
+            "categorieAnalyser": category
+                } 
+            URL_ =  f"https://iotbackend-4ufq.onrender.com/api/jeter/{category}"
+            cat = requests.post(URL_, json=payload)
+
+            cat.raise_for_status()
 
         current_status = "off"
         status_led.off()
@@ -445,6 +454,10 @@ def take_and_send_photo():
         print("Upload failed:", e)
         status_led.off()
         result_led.color = RED
+        category = "autre"
+        print("avant play response")
+        play_response(category)
+        play_response("merci")
         Thread(target=reset_system, daemon=True).start()
 
 bin_thread = Thread(target=bin_monitor)
